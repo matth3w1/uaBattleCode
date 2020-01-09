@@ -1,0 +1,6 @@
+int  |  Movement Description
+
+0	No movement
+1	Move towards objective
+2	Wander randomly
+3	Wander thoughtfully (implement and define later)

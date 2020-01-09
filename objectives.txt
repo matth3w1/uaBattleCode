@@ -1,0 +1,5 @@
+int  |  Objective Description
+
+0	No current objective
+1	Mine soup (Miner only) - This includes the phase of moving towards the soup objective and waiting until a certain amount of soup has been obtained
+2	Deposit soup (Miner only) - This includes the phase of moving towards the nearest (or last seen refinery) and actually depositing the soup
