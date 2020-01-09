@@ -10,16 +10,44 @@ public strictfp class RobotPlayer {
 
     static int turnCount;
     
-    static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will be updated with team HQ position on turn 0/1?
-    static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will update with TEAM_HQ_LOCATION based on mirroring
-    static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //MapLocation object which holds where a robot spawned
+    /**
+     * Private Instance Variables used by all robots (note - some may not be valid or used)
+     * 
+     * TEAM_HQ_LOCATION is MapLocation of where the team HQ is positioned
+     * ENEMEY_HQ_LOCATION is MapLocation of where the enemy HQ is positioned
+     * SPAWN_LOCATION is MapLocation of where this spesific unit has spawned
+     * 
+     * objective is a numerical representation of what the current robot wants to accomplish.  See objectives.txt to find objective description
+     * movement is a numerical representation of how the current robot should move.  See movement.txt to find movement descriptions
+     * 
+     * targetLocation is MapLocation of where the current target
+     */
+    static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); 
+    static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); 
+    static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //can this be updates as the robot is created
     
-    static MapLocation ClosestRefinnery = new MapLocation(-1, -1);
+    static int objective = 0; 
+    static int movement = 0;
     
-    static MapLocation targetLocation = new MapLocation(0, 0); //MapLocation object which current robot will attempt to go to
+    static MapLocation targetLocation = new MapLocation(-1, -1);
     
-    static int objective = 0; //int reperesenting objective of robot. 0 means no objective and other numbers represent other objectives.  Reference objectives.txt for number explinations
-    static int movement = 0; //int for how the robot should move.  If the robot is a building, ignored.  Reference movement.txt for kinds of movements
+    
+    /**
+     * Private Instance Variables only used by the Miner robot
+     * 
+     * MIN_SOUP_AMOUNT is the minimum amount of soup a tile must have so the miner goes toward that tile
+     * MIN_SOUP_DEPOSIT_AMOUNT is the minimum amount of soup a miner must collect before refining 
+     * 
+     * closestRefinery is a MapLocation of the last closest refinery.  New refinery are searched for every (x) rounds
+     */
+    static final int MIN_SOUP_AMOUNT = 10;
+    static final int MIN_SOUP_DEPOSIT_AMOUNT = 50;
+    
+    static MapLocation closestRefinery = new MapLocation(-1, -1); //MapLocation of the nearest refinery
+    
+    
+    
+    
     
     //Need different variables to describe what the objective of current robot.  Ex miners want to go to soup unless they have too much
     //Also need to differentiate between robot types
@@ -85,40 +113,49 @@ public strictfp class RobotPlayer {
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
     	
-    	switch(objective) {
-    		case 0: //Wander randomly and look for soup and refineries
+    	switch(movement) {
+    		case 0: //no movement
+    		break; 
     		
+    		case 1: //Move toward the current objective
+    			if(targetLocation.isAdjacentTo(rc.getLocation())) {
+    				movement = 0;
+    			}
+    			moveToward(targetLocation);
+    		break;
+    		
+    		case 2: //Wander Randomly	
     			Direction d;
     			//Add check case if cooldown is greater than 1
-    			
     			do {
     				d  = randomDirection();
     			} while(!(tryMove(d)));
-    			
-    			//Scans the area around miner for soup
-    			int maxSoup = -1;
-    			MapLocation maxSoupLocation = new MapLocation(-1, -1);
-    			for(int x = 5; x >= -5; x--) {
-    				for(int y = 5; y >= - 5; y--) {
-    					if(rc.canSenseLocation(rc.getLocation().translate(x, y))) {
-    						if(rc.senseSoup(rc.getLocation().translate(x, y)) > maxSoup) {
-    							maxSoupLocation = rc.getLocation().translate(x, y);
-    							maxSoup = rc.senseSoup(rc.getLocation().translate(x, y));
-    						}
-    					}
-    				}
+    		
+    	}
+    	
+    	switch(objective) {
+    		case 0: //do nothing
+    		break;
+    		
+    		case 1: //Search for soup
+	    		MapLocation soupLocation = scanForSoup();
+	    		if(!(soupLocation.equals(null))) { //If soup has been found
+	    			objective = 2;
+	    			movement = 1;
+	    		}
+    		break;
+    		
+    		case 2: //Mine soup
+    			if(rc.getSoupCarrying() >= MIN_SOUP_DEPOSIT_AMOUNT) { //Gathered enough soup. Goto nearest refinery
+    				objective = 3;
+    				movement = 1;
     			}
-		    	
-		    	
-		    	break;
-		    	
-    		case 1: //Goes to sensed food
     			
-    			if(rc.getLocation().isAdjacentTo(targetLocation)) {
-    				objective = 2; //Sets objective to mining soup on adjacent tile
-    			} else {
-    				rc.move(rc.getLocation().directionTo(targetLocation));
-    			}
+    		break;
+    		
+    		case 3: //Deposit soup
+    			
+    			
     	}
     } 
     
@@ -263,5 +300,84 @@ public strictfp class RobotPlayer {
                 rc.submitTransaction(message, 10);
         }
         // System.out.println(rc.getRoundMessages(turnCount-1));
+    }
+    
+
+    /**
+     * Scans the area for the highest amount of soup
+     * 
+     * @param None
+     * @return MapLocation of the highest amount of soup
+     * @throws GameActionException
+     */
+    static MapLocation scanForSoup() throws GameActionException {
+    	int maxSoup = 0;
+    	MapLocation maxSoupLocation = new MapLocation(-1, -1);
+    	
+    	for(int x = -5; x <= 5; x++) {
+    		for(int y = -5; y <= 5; y++) {
+    			MapLocation testLoc = rc.getLocation().translate(x, y);
+    			if(rc.canSenseLocation(testLoc)) {
+    				if(rc.senseSoup(testLoc) > maxSoup && !(rc.senseFlooding(testLoc))) {
+    					maxSoup = rc.senseSoup(testLoc);
+    					maxSoupLocation = testLoc;
+    				}
+    			}
+    		}
+    	}
+    	if(maxSoup == 0)
+    		return null;
+    	return maxSoupLocation;
+    }
+    
+    /**
+     * Moves toward the objective location 
+     * 
+     * @param loc to move toward
+     * @return true if the movement was performed
+     * @throws GameActionException
+     */
+    static boolean moveToward(MapLocation loc) throws GameActionException {
+    	Direction dir = rc.getLocation().directionTo(loc);
+    	
+    	if(!(rc.senseFlooding(rc.getLocation().add(dir))) && rc.canMove(dir)) {
+    		rc.move(dir);
+    		return true;
+    	}
+    	return false;
+    }
+    
+    /**
+     * Finds the nearest type of robot
+     * 
+     * @param type of robot to look for
+     * @return MapLocation of the robot, null otherwise
+     * @throws GameActionException
+     */
+    static MapLocation findNearestRobotType(RobotType type) {
+    	RobotInfo[] robots = rc.senseNearbyRobots();
+    	for(RobotInfo robot : robots) {
+    		if(robot.type.equals(type)) {
+    			return robot.location;
+    		}
+    	}
+    	return null;
+    }
+    
+    /**
+     * Finds the nearest type of robot
+     * 
+     * @param type of robot to look for and which team
+     * @return MapLocation of the robot, null otherwise
+     * @throws GameActionException
+     */
+    static MapLocation findNearestRobotTypeOnTeam(RobotType type, Team team) {
+    	RobotInfo[] robots = rc.senseNearbyRobots();
+    	for(RobotInfo robot : robots) {
+    		if(robot.type.equals(type) && robot.team.equals(team)) {
+    			return robot.location;
+    		}
+    	}
+    	return null;
     }
 }
