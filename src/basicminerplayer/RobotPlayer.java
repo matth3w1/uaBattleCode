@@ -1,5 +1,6 @@
 package basicminerplayer;
 import battlecode.common.*;
+import battlecode.instrumenter.inject.System;
 
 public strictfp class RobotPlayer {
     static RobotController rc;
@@ -17,14 +18,21 @@ public strictfp class RobotPlayer {
      * ENEMEY_HQ_LOCATION is MapLocation of where the enemy HQ is positioned
      * SPAWN_LOCATION is MapLocation of where this spesific unit has spawned
      * 
+     * MAP_HEIGHT is an int which represents the map height
+     * MAP_WIDTH is an int which represents the map width
+     * 
      * objective is a numerical representation of what the current robot wants to accomplish.  See objectives.txt to find objective description
      * movement is a numerical representation of how the current robot should move.  See movement.txt to find movement descriptions
      * 
      * targetLocation is MapLocation of where the current target
      */
-    static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); 
+    static MapLocation TEAM_HQ_LOCATION = null; 
     static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); 
     static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //can this be updates as the robot is created
+    
+    static int MAP_HEIGHT = 0;
+    static int MAP_WIDTH = 0;
+    
     
     static int objective = 0; 
     static int movement = 0;
@@ -65,14 +73,14 @@ public strictfp class RobotPlayer {
 
         turnCount = 0;
 
-        System.out.println("I'm a " + rc.getType() + " and I just got created!");
+        //System.out.println("I'm a " + rc.getType() + " and I just got created!");
         while (true) {
             turnCount += 1;
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
             try {
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
-                System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
+                //System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
                 switch (rc.getType()) {
                     case HQ:                 runHQ();                break;
                     case MINER:              runMiner();             break;
@@ -97,13 +105,20 @@ public strictfp class RobotPlayer {
     
     //Code for the HQ
     static void runHQ() throws GameActionException {
-    	if(turnCount == 1) {
-    		TEAM_HQ_LOCATION = rc.getLocation();
-    		System.out.println("I am HQ located at " + TEAM_HQ_LOCATION);
-    	}
     	
-    	if(TEAM_HQ_LOCATION.equals(new MapLocation(0, 0))) {
-    		rc.resign();
+    	if(turnCount == 1) { //First turn of the HQ
+    		TEAM_HQ_LOCATION = rc.getLocation();
+    		MAP_HEIGHT = rc.getMapHeight(); //This is NOT an error
+    		MAP_WIDTH = rc.getMapWidth(); //This is NOT and error
+    		System.out.println(turnCount);
+    		System.out.println("I am the HQ located at " + TEAM_HQ_LOCATION);
+    		System.out.println("The map is " + MAP_HEIGHT + " by " + MAP_WIDTH);
+    		
+    		int[] message = {TEAM_HQ_LOCATION.x, TEAM_HQ_LOCATION.y, MAP_HEIGHT, MAP_WIDTH, 0, 0, 0}; //first two ints are the HQ xy pos and second are height and width
+    		rc.submitTransaction(message, 1);
+
+    		//rc.buildRobot(RobotType.MINER, randomDirection ());
+    		
     	}
         
     }
@@ -112,6 +127,8 @@ public strictfp class RobotPlayer {
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
+    	//System.out.println(turnCount);
+    	
     	
     	switch(movement) {
     		case 0: //no movement
