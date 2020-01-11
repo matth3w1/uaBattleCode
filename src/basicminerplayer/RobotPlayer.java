@@ -1,6 +1,5 @@
 package basicminerplayer;
 import battlecode.common.*;
-import battlecode.instrumenter.inject.System;
 
 public strictfp class RobotPlayer {
     static RobotController rc;
@@ -25,19 +24,26 @@ public strictfp class RobotPlayer {
      * movement is a numerical representation of how the current robot should move.  See movement.txt to find movement descriptions
      * 
      * targetLocation is MapLocation of where the current target
+     * 
+     * transactionIdentifier is a number added to transactions to identify that transaction as from this team
      */
-    static MapLocation TEAM_HQ_LOCATION = null; 
-    static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); 
-    static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //can this be updates as the robot is created
+    static MapLocation TEAM_HQ_LOCATION = new MapLocation(-1, -1);  
+    static MapLocation ENEMY_HQ_LOCATION = new MapLocation(-1, -1); 
+    static MapLocation SPAWN_LOCATION = new MapLocation(-1, -1); //can this be updates as the robot is created
     
     static int MAP_HEIGHT = 0;
     static int MAP_WIDTH = 0;
     
+    //Maybe add a transaction array for the round one block for every robot to add to?
+    //Round 1 block will need more useful information for this to be useful
     
     static int objective = 0; 
-    static int movement = 0;
+//    static int movement = 0;
     
     static MapLocation targetLocation = new MapLocation(-1, -1);
+    static final MapLocation INVALID_LOCATION = new MapLocation(-1, -1);
+    
+    static int transactionIdentifier = 420; //Blaze it
     
     
     /**
@@ -48,8 +54,8 @@ public strictfp class RobotPlayer {
      * 
      * closestRefinery is a MapLocation of the last closest refinery.  New refinery are searched for every (x) rounds
      */
-    static final int MIN_SOUP_AMOUNT = 10;
-    static final int MIN_SOUP_DEPOSIT_AMOUNT = 50;
+    static final int MIN_SOUP_AMOUNT = 200;
+    static final int MIN_SOUP_DEPOSIT_AMOUNT = 100;
     
     static MapLocation closestRefinery = new MapLocation(-1, -1); //MapLocation of the nearest refinery
     
@@ -108,16 +114,23 @@ public strictfp class RobotPlayer {
     	
     	if(turnCount == 1) { //First turn of the HQ
     		TEAM_HQ_LOCATION = rc.getLocation();
-    		MAP_HEIGHT = rc.getMapHeight(); //This is NOT an error
-    		MAP_WIDTH = rc.getMapWidth(); //This is NOT and error
+    		MAP_HEIGHT = rc.getMapHeight();
+    		MAP_WIDTH = rc.getMapWidth();
     		System.out.println(turnCount);
     		System.out.println("I am the HQ located at " + TEAM_HQ_LOCATION);
     		System.out.println("The map is " + MAP_HEIGHT + " by " + MAP_WIDTH);
     		
-    		int[] message = {TEAM_HQ_LOCATION.x, TEAM_HQ_LOCATION.y, MAP_HEIGHT, MAP_WIDTH, 0, 0, 0}; //first two ints are the HQ xy pos and second are height and width
+    		MapLocation maxSoupLocation = advancedScanForSoup(rc.getCurrentSensorRadiusSquared());
+    		//System.out.println("The maximum amount of soup is located at (" + maxSoup.x + ", " + maxSoup.y + ")");
+    		int[] message = {TEAM_HQ_LOCATION.x, TEAM_HQ_LOCATION.y, maxSoupLocation.x, maxSoupLocation.y, 0, 0, transactionIdentifier}; //first two ints are the HQ xy pos and second are closest soup locations
     		rc.submitTransaction(message, 1);
-
-    		//rc.buildRobot(RobotType.MINER, randomDirection ());
+    		
+    		if(maxSoupLocation.x != -1) { // If there is soup near, spawn closest to soup.  Otherwise go towards center of map
+    			//cnage these to tryBuild in case there is an unhandeled exception
+    			rc.buildRobot(RobotType.MINER, TEAM_HQ_LOCATION.directionTo(maxSoupLocation));
+    		} else {
+    			rc.buildRobot(RobotType.MINER, TEAM_HQ_LOCATION.directionTo(new MapLocation(MAP_WIDTH / 2, MAP_HEIGHT / 2)));
+    		}
     		
     	}
         
@@ -127,50 +140,99 @@ public strictfp class RobotPlayer {
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
-    	//System.out.println(turnCount);
+    	System.out.println("Miner turn " + turnCount);
+    	System.out.println("Soup: " + rc.getSoupCarrying());
     	
-    	
-    	switch(movement) {
-    		case 0: //no movement
-    		break; 
+    	if(turnCount == 1) {
+    		Transaction[] roundOneBlock = rc.getBlock(1);
+    		debugPrintTransactionBlock(roundOneBlock);
+    		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(roundOneBlock, rc.getTeam());
+    		int[] roundOneMessage = roundOneTeamBlock[0].getMessage();
     		
-    		case 1: //Move toward the current objective
-    			if(targetLocation.isAdjacentTo(rc.getLocation())) {
-    				movement = 0;
-    			}
-    			moveToward(targetLocation);
-    		break;
+    		TEAM_HQ_LOCATION = new MapLocation(roundOneMessage[0], roundOneMessage[1]);
+    		MAP_HEIGHT = rc.getMapHeight();
+    		MAP_WIDTH = rc.getMapWidth();
+    		closestRefinery = TEAM_HQ_LOCATION;
     		
-    		case 2: //Wander Randomly	
-    			Direction d;
-    			//Add check case if cooldown is greater than 1
-    			do {
-    				d  = randomDirection();
-    			} while(!(tryMove(d)));
-    		
+    		targetLocation = new MapLocation(roundOneMessage[2], roundOneMessage[3]);
+    		if(targetLocation.equals(INVALID_LOCATION)) {
+    			objective = 1;
+//    			movement = 2;
+    		} else {
+    			targetLocation = advancedScanForSoup(rc.getCurrentSensorRadiusSquared());
+    			objective = 2;
+//    			movement = 1;
+    		}
     	}
+    	
+
+/**
+ *   	switch(movement) {
+ *   		case 0: //no movement
+ *   		break; 
+ *  		
+ *   		case 1: //Move toward the current objective
+ *   			if(targetLocation.isAdjacentTo(rc.getLocation())) {
+ *   				movement = 0;
+ *   				objective = 2;
+ *   			}
+ *   			moveToward(targetLocation);
+ *   		break;
+ *   		
+ *   		case 2: //Wander Randomly	
+ *   			Direction d = randomDirection();
+ *   			while(!(tryMove(d))) {
+ *   				//update scan
+ *   				d = randomDirection();
+ *  				Clock.yield();
+ *   			}
+ *   		
+ *   	}
+**/
     	
     	switch(objective) {
     		case 0: //do nothing
     		break;
     		
     		case 1: //Search for soup
-	    		MapLocation soupLocation = scanForSoup();
-	    		if(!(soupLocation.equals(null))) { //If soup has been found
-	    			objective = 2;
-	    			movement = 1;
-	    		}
-    		break;
-    		
-    		case 2: //Mine soup
-    			if(rc.getSoupCarrying() >= MIN_SOUP_DEPOSIT_AMOUNT) { //Gathered enough soup. Goto nearest refinery
-    				objective = 3;
-    				movement = 1;
+    			if(turnCount % 4 == 0) { //Will search for soup every 4 turns (or there is enough bytecode left)
+		    		MapLocation soupLocation = advancedScanForSoup(rc.getCurrentSensorRadiusSquared());
+		    		if(!(soupLocation.equals(INVALID_LOCATION))) { //If soup has been found
+		    			objective = 2;
+		    			targetLocation = soupLocation;
+		    		}
     			}
-    			
+    			moveToward(targetLocation);
     		break;
     		
-    		case 3: //Deposit soup
+    		
+    		case 2: //Go to soup
+    			if(rc.getLocation().isAdjacentTo(targetLocation)) {
+    				objective = 3;
+    				tryMine(rc.getLocation().directionTo(targetLocation));
+    			} else {
+    				moveToward(targetLocation);
+    			}
+    		break;
+    		
+    		
+    		case 3: //Mine soup
+    			if(rc.getSoupCarrying() >= MIN_SOUP_DEPOSIT_AMOUNT) {
+    				objective = 4;
+    				moveToward(closestRefinery);
+    			} else {
+    				tryMine(rc.getLocation().directionTo(targetLocation));
+    			}
+    		break;
+    		
+    		
+    		case 4: //Move to refinery and then deposit
+    			if(rc.getLocation().isAdjacentTo(closestRefinery)) {
+    				if(tryRefine(rc.getLocation().directionTo(closestRefinery)))
+    					objective = 1;
+    			} else {
+    				moveToward(closestRefinery);
+    			}
     			
     			
     	}
@@ -329,7 +391,7 @@ public strictfp class RobotPlayer {
      */
     static MapLocation scanForSoup() throws GameActionException {
     	int maxSoup = 0;
-    	MapLocation maxSoupLocation = new MapLocation(-1, -1);
+    	MapLocation maxSoupLocation = new MapLocation(-1, -1); 
     	
     	for(int x = -5; x <= 5; x++) {
     		for(int y = -5; y <= 5; y++) {
@@ -342,8 +404,28 @@ public strictfp class RobotPlayer {
     			}
     		}
     	}
-    	if(maxSoup == 0)
-    		return null;
+    	return maxSoupLocation;
+    }
+    
+    static MapLocation advancedScanForSoup(int radius) throws GameActionException {
+    	int maxSoup = 0;
+    	MapLocation maxSoupLocation = new MapLocation(-1, -1); 
+    	
+    	int rootRadius = (int) Math.floor(Math.sqrt(radius));
+    	
+    	for(int x = -rootRadius; x <= rootRadius; x++) {
+    		for(int y = -rootRadius; y <= rootRadius; y++) {
+    			//System.out.println(x + " " + y);
+    			if(rc.canSenseLocation(rc.getLocation().translate(x, y))) {
+    				if(rc.senseSoup(rc.getLocation().translate(x, y)) > maxSoup && !(rc.senseFlooding(rc.getLocation().translate(x, y)))) {
+    					maxSoup = rc.senseSoup(rc.getLocation().translate(x, y));
+    					maxSoupLocation = rc.getLocation().translate(x, y);
+    				}
+    			}
+    		}
+    	}
+    	
+    	
     	return maxSoupLocation;
     }
     
@@ -368,7 +450,7 @@ public strictfp class RobotPlayer {
      * Finds the nearest type of robot
      * 
      * @param type of robot to look for
-     * @return MapLocation of the robot, null otherwise
+     * @return MapLocation of the robot, -1, -1 otherwise (invalid MapLocation
      * @throws GameActionException
      */
     static MapLocation findNearestRobotType(RobotType type) {
@@ -396,5 +478,52 @@ public strictfp class RobotPlayer {
     		}
     	}
     	return null;
+    }
+    
+    /**
+     * Prints off block of transactions
+     * 
+     * @param array of transactions
+     * @throws GameActionException
+     */
+    static void debugPrintTransactionBlock(Transaction[] block) throws GameActionException {
+    	for(Transaction trans : block) {
+			for(int test : trans.getMessage()) {
+				System.out.print(test + ", ");
+			}
+			System.out.println();
+		}
+    }
+    
+    /**
+     * Verifies a message is from our team
+     * 
+     * @param message (int array) to be verified
+     * @returns true if the message is from our team, false otherwise
+     * @throws GameActionException
+     */
+    static boolean verifyMessage(int[] message) throws GameActionException {
+    	//Implement later
+    	return(message[6] == transactionIdentifier);
+    }
+    
+    /**
+     * Returns transactions from a specific team from an array of transactions (block)
+     * 
+     * @param block of transactions and team
+     * @returns block of transactions from specific team
+     * @throws GameActionException
+     */
+    static Transaction[] seperateTransactionsFromTeam(Transaction[] block, Team team) throws GameActionException {
+    	Transaction[] teamBlock = new Transaction[7];
+    	int teamBlockIndex = 0;
+    	
+    	for(int i = 0; i < block.length; i++) {
+    		if(verifyMessage(block[i].getMessage())) {
+    			teamBlock[teamBlockIndex++] = block[i];
+    		}
+    	}
+    	
+    	return teamBlock;
     }
 }

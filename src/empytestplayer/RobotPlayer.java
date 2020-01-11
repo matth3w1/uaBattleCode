@@ -1,5 +1,6 @@
 package empytestplayer;
 import battlecode.common.*;
+import battlecode.instrumenter.inject.System;
 
 public strictfp class RobotPlayer {
     static RobotController rc;
@@ -9,6 +10,50 @@ public strictfp class RobotPlayer {
             RobotType.FULFILLMENT_CENTER, RobotType.NET_GUN};
 
     static int turnCount;
+    
+    /**
+     * Private Instance Variables used by all robots (note - some may not be valid or used)
+     * 
+     * TEAM_HQ_LOCATION is MapLocation of where the team HQ is positioned
+     * ENEMEY_HQ_LOCATION is MapLocation of where the enemy HQ is positioned
+     * SPAWN_LOCATION is MapLocation of where this spesific unit has spawned
+     * 
+     * MAP_HEIGHT is an int which represents the map height
+     * MAP_WIDTH is an int which represents the map width
+     * 
+     * objective is a numerical representation of what the current robot wants to accomplish.  See objectives.txt to find objective description
+     * movement is a numerical representation of how the current robot should move.  See movement.txt to find movement descriptions
+     * 
+     * targetLocation is MapLocation of where the current target
+     */
+    //static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); 
+    //static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); 
+    //static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //can this be updates as the robot is created
+    
+    //static int MAP_HEIGHT = 0;
+    //static int MAP_WIDTH = 0;
+    
+    
+    //static int objective = 0; 
+    //static int movement = 0;
+    
+    //static MapLocation targetLocation = new MapLocation(-1, -1);
+    
+    
+    /**
+     * Private Instance Variables only used by the Miner robot
+     * 
+     * MIN_SOUP_AMOUNT is the minimum amount of soup a tile must have so the miner goes toward that tile
+     * MIN_SOUP_DEPOSIT_AMOUNT is the minimum amount of soup a miner must collect before refining 
+     * 
+     * closestRefinery is a MapLocation of the last closest refinery.  New refinery are searched for every (x) rounds
+     */
+    //static final int MIN_SOUP_AMOUNT = 10;
+    //static final int MIN_SOUP_DEPOSIT_AMOUNT = 50;
+    
+    //static MapLocation closestRefinery = new MapLocation(-1, -1); //MapLocation of the nearest refinery
+    
+    
 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
@@ -53,7 +98,9 @@ public strictfp class RobotPlayer {
         }
     }
 
+    //Code for the HQ
     static void runHQ() throws GameActionException {
+    	
         
     }
 

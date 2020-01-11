@@ -1,6 +1,6 @@
 int  |  Objective Description
 
 0	No current objective
-1	Look for soup (Minder only) - Uses the scanForSoup() method to find the nearest and highest concentration of soup
+1	Look for soup (Miner only) - Uses the scanForSoup() method to find the nearest and highest concentration of soup
 2	Mine soup (Miner only) - This includes the phase of looking for soup, moving towards the soup objective and waiting until a certain amount of soup has been obtained
 3	Deposit soup (Miner only) - This includes the phase of moving towards the nearest (or last seen refinery) and actually depositing the soup
