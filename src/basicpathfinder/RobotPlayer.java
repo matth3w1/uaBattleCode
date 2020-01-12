@@ -279,16 +279,17 @@ public strictfp class RobotPlayer {
     }
     static void mapObstacles() throws GameActionException {
     	MapLocation currentLocation = rc.getLocation();
-    	
-    	if(rc.canSenseRadiusSquared(3))
-    		rc.senseNearbyRobots(3);
+    	RobotInfo robots[];
+    	if(rc.canSenseRadiusSquared(3)) {
+    		robots = rc.senseNearbyRobots(3);
+    		for(int i = 0; i < robots.length; i++) {
+    			obstacles[robots[i].getLocation().x-currentLocation.x][robots[i].getLocation().y-currentLocation.y] = false;
+    		}
+    	}
     	for(int i = -3; i < 4; i++) {
     		for(int j = -3; i < 4; j++) {
     			MapLocation xy = rc.getLocation().translate(i, j);
     			if(!(rc.senseFlooding(xy)))
-    				
-    				obstacles[i+3][j+3] = false;
-    			if((rc.senseRobotAtLocation(xy)))
     				obstacles[i+3][j+3] = false;
     		}
     	}
