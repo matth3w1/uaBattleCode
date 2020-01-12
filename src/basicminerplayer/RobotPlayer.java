@@ -56,12 +56,14 @@ public strictfp class RobotPlayer {
      * 
      * closestRefinery is a MapLocation of the last closest refinery.  New refinery are searched for every (4) rounds
      * soupLocations is a key, value pair of loc, amount for all soup seen (or read) by a miner.  Continuous memory
+     * hasSpawnedRefinery is false until miner has spawned in a refinery.  Latches true
      */
     static final int MIN_SOUP_AMOUNT = 200;
     static final int MIN_SOUP_DEPOSIT_AMOUNT = 100;
     
-    static MapLocation closestRefinery = new MapLocation(-1, -1); //MapLocation of the nearest refinery
+    static MapLocation closestRefinery = new MapLocation(-1, -1);
     static HashMap<MapLocation, Integer> soupLocations = new HashMap<MapLocation, Integer>();
+    static boolean hasSpawnedRefinery = false;
     
     
     /**
@@ -153,7 +155,16 @@ public strictfp class RobotPlayer {
     	//Scans the area for nearby robots
     	//Scans the area for topography (high/low dirt walls and water)
     	
-    	
+    	if(shouldSpawnMiner()) {
+    		Direction d = randomDirection();
+    		if(!(tryBuild(RobotType.MINER, d))) {
+    			if(!(tryBuild(RobotType.MINER, d.rotateLeft()))) {
+    				if(!(tryBuild(RobotType.MINER, d.rotateRight()))) {
+    					numMinersSpawned++;
+    				}
+    			}
+    		}
+    	}
         
     }
 
@@ -163,6 +174,8 @@ public strictfp class RobotPlayer {
     static void runMiner() throws GameActionException {
     	System.out.println("Miner turn " + turnCount);
     	System.out.println("Soup: " + rc.getSoupCarrying());
+    	System.out.println("Objective: " + objective);
+    	
     	
     	//First turn setup for nearest soup and blockchain
     	if(turnCount == 1) {
@@ -176,24 +189,35 @@ public strictfp class RobotPlayer {
     		MAP_WIDTH = rc.getMapWidth();
     		closestRefinery = TEAM_HQ_LOCATION;
     		
-    		if(rc.getRoundNum() == 2) {
+    		if(rc.getRoundNum() == 2) { //If this is the first miner spawned
 	    		targetLocation = new MapLocation(roundOneMessage[2], roundOneMessage[3]);
-	    		if(!(targetLocation.equals(INVALID_LOCATION))) {
+	    		if(!(targetLocation.equals(INVALID_LOCATION))) { //If there is soup near the HQ
 	    			objective = 1;
-	    		} else {
-	    			targetLocation = scanForSoup(rc.getCurrentSensorRadiusSquared());
-	    			objective = 2;
+	    		} else { //No nearby soup so look for soup.  Go to center and look for soup
+	    			targetLocation = new MapLocation(rc.getMapHeight() / 2, rc.getMapWidth() / 2);
+	    			objective = 1;
 	    		}
-    		} else {
-    			targetLocation = scanForSoup(rc.getCurrentSensorRadiusSquared());
-    			objective = 2;
+    		} else { //No nearby soup so look for soup.  Go to center and look for soup
+    			targetLocation = new MapLocation(rc.getMapHeight() / 2, rc.getMapWidth() / 2);
+    			objective = 1;
     		}
     	}
     	
     	
     	//Add to and update the soupLocations Map
+    	//Currently uses ~7,000 bytecode
+    	//Should make more efficient later
     	if(turnCount % 4 == 0) {
     		advancedScanForSoup(rc.getCurrentSensorRadiusSquared());
+    		System.out.println("Updating Soup");
+    		System.out.println(soupLocations);
+    	}
+    	
+    	//update closest refinery
+    	if(turnCount % 4 == 1) {
+    		updateClosestRefinery();
+    		System.out.println("New CLosest Refinery");
+    		System.out.println(closestRefinery);
     	}
 
     	
@@ -226,21 +250,33 @@ public strictfp class RobotPlayer {
     		
     		
     		case 2: //Go to soup
+    			rc.setIndicatorLine(rc.getLocation(), targetLocation, 0, 255, 0);
+    			
     			if(rc.getLocation().isAdjacentTo(targetLocation)) {
+    				if(rc.senseSoup(targetLocation) == 0) {
+    					soupLocations.remove(targetLocation);
+    					objective = 1;
+    				} else {
     				objective = 3;
     				tryMine(rc.getLocation().directionTo(targetLocation));
+    				}
     			} else {
+    				if(!(hasSpawnedRefinery) && turnCount % 5 == 0) {
+    					if(shouldSpawnRefinery()) {
+    						hasSpawnedRefinery = tryBuild(RobotType.REFINERY, randomDirection());
+    					}
+    				}
     				moveToward(targetLocation);
     			}
     		break;
     		
     		
     		case 3: //Mine soup
-    			if(rc.getSoupCarrying() >= MIN_SOUP_DEPOSIT_AMOUNT) {
+    			if(rc.getSoupCarrying() >= MIN_SOUP_DEPOSIT_AMOUNT) { // Carrying enough soup
     				objective = 4;
     				moveToward(closestRefinery);
-    			} else {
-    				tryMine(rc.getLocation().directionTo(targetLocation));
+    			} else if(!(tryMine(rc.getLocation().directionTo(targetLocation)))) { //Mining is innefective and not enough soup
+    				objective = 1;
     			}
     		break;
     		
@@ -256,8 +292,8 @@ public strictfp class RobotPlayer {
     			
     	}
     } 
-    
-    //Code for the ref
+
+	//Code for the ref
     static void runRefinery() throws GameActionException {
         // System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()));
     }
@@ -367,7 +403,8 @@ public strictfp class RobotPlayer {
      * @throws GameActionException
      */
     static boolean tryMine(Direction dir) throws GameActionException {
-        if (rc.isReady() && rc.canMineSoup(dir)) {
+    	System.out.println(turnCount);
+        if (rc.isReady() && rc.canMineSoup(dir) && rc.senseSoup(rc.getLocation().add(dir)) != 0) {
             rc.mineSoup(dir);
             return true;
         } else return false;
@@ -437,6 +474,7 @@ public strictfp class RobotPlayer {
     static void advancedScanForSoup(int radius) throws GameActionException { 	
     	int rootRadius = (int) Math.floor(Math.sqrt(radius));
     	
+    	searchloop:
     	for(int x = -rootRadius; x <= rootRadius; x++) {
     		for(int y = -rootRadius; y <= rootRadius; y++) {
     			//System.out.println(x + " " + y);
@@ -449,6 +487,9 @@ public strictfp class RobotPlayer {
     				} else {
     					soupLocations.put(testLoc, rc.senseSoup(testLoc));
     				}
+    			}
+    			if(soupLocations.size() > 5) {
+    				break searchloop;
     			}
     		}
     	}
@@ -475,7 +516,7 @@ public strictfp class RobotPlayer {
      * Finds the nearest type of robot
      * 
      * @param type of robot to look for
-     * @return MapLocation of the robot, -1, -1 otherwise (invalid MapLocation
+     * @return MapLocation of the robot, -1, -1 otherwise (invalid MapLocation)
      * @throws GameActionException
      */
     static MapLocation findNearestRobotType(RobotType type) {
@@ -485,14 +526,14 @@ public strictfp class RobotPlayer {
     			return robot.location;
     		}
     	}
-    	return null;
+    	return INVALID_LOCATION;
     }
     
     /**
      * Finds the nearest type of robot
      * 
      * @param type of robot to look for and which team
-     * @return MapLocation of the robot, null otherwise
+     * @return MapLocation of the robot, invalid otherwise
      * @throws GameActionException
      */
     static MapLocation findNearestRobotTypeOnTeam(RobotType type, Team team) {
@@ -502,7 +543,7 @@ public strictfp class RobotPlayer {
     			return robot.location;
     		}
     	}
-    	return null;
+    	return INVALID_LOCATION;
     }
     
     /**
@@ -557,11 +598,40 @@ public strictfp class RobotPlayer {
      * 
      * @param numMiners
      * @return true if algorithm dictates new miner
+     * @throws GameActionException
      */
-    static boolean shouldSpawnNewMiner(int numMiners) {
+    static boolean shouldSpawnMiner() throws GameActionException {
     	//Make more advanced later
-    	if(numMiners > 5)
+    	if(numMinersSpawned > 5)
     		return false;
     	return true;
+    }
+    
+    /**
+     * Scans the nearby area for team refineries
+     * 
+     * @param none
+     * @return true if closest refinery has been updated, false otherwise
+     * @throws GameActionEception
+     */
+    static boolean updateClosestRefinery() throws GameActionException {
+    	if(findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam()).equals(INVALID_LOCATION)) {
+    		return false;
+    	}
+    	closestRefinery = findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam());
+    	return true;
+    }
+    
+    /**
+     * Decides if a miner should create a refienry based off of current game parameters
+     * 
+     * @return true if a refinery should be spawned
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnRefinery() throws GameActionException {
+    	if(rc.getLocation().distanceSquaredTo(TEAM_HQ_LOCATION) > 25 && rc.getLocation().distanceSquaredTo(targetLocation) > 25) {
+    		return true;
+    	}
+    	return false;
     }
 }

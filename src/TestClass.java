@@ -1,6 +1,5 @@
-import java.util.Arrays;
+
 import java.util.HashMap;
-import java.util.Map;
 
 public class TestClass {
 	
@@ -8,11 +7,15 @@ public class TestClass {
 
 	public static void main(String[] args) {
 		
-		testMap.put(17, 1);
-		testMap.put(6, 3);
-		
-		testMap.remove(5);
-		
-		System.out.println(testMap);
+		int size = 0;
+		for(int x = 0; x < 5; x++) {
+			for(int y = 0; y < 5; y++) {
+				size++;
+				if(size > 10) {
+					break;
+				}
+			}
+		}
+		System.out.println(size);
 	}
 }
