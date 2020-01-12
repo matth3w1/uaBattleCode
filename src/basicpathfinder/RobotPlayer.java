@@ -24,6 +24,9 @@ public strictfp class RobotPlayer {
     //Need different variables to describe what the objective of current robot.  Ex miners want to go to soup unless they have too much
     //Also need to differentiate between robot types
 
+    static boolean[][] obstacles = new boolean[7][7];
+    static int[][] elevation = new int[7][7];
+    static Direction[] moves = new Direction[10]; 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * If this method returns, the robot dies!
@@ -263,5 +266,31 @@ public strictfp class RobotPlayer {
                 rc.submitTransaction(message, 10);
         }
         // System.out.println(rc.getRoundMessages(turnCount-1));
+    }
+    
+    static void followPath() throws GameActionException {
+    	
+    	Direction dir = moves[moveIndex++];
+    	if(!(tryMove(dir))) {
+    		remapObstacles();
+    		createNewPath();
+    	}
+    	
+    }
+    static void mapObstacles() throws GameActionException {
+    	MapLocation currentLocation = rc.getLocation();
+    	
+    	if(rc.canSenseRadiusSquared(3))
+    		rc.senseNearbyRobots(3);
+    	for(int i = -3; i < 4; i++) {
+    		for(int j = -3; i < 4; j++) {
+    			MapLocation xy = rc.getLocation().translate(i, j);
+    			if(!(rc.senseFlooding(xy)))
+    				
+    				obstacles[i+3][j+3] = false;
+    			if((rc.senseRobotAtLocation(xy)))
+    				obstacles[i+3][j+3] = false;
+    		}
+    	}
     }
 }
