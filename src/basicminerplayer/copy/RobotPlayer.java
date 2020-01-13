@@ -10,7 +10,7 @@ public strictfp class RobotPlayer {
 
     static int turnCount;
     
-    static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will be updated with team HQ position on turn 0/1?
+    static MapLocation TEAM_HQ_LOCATION = new MapLocation(5, 26); //MapLocation object which will be updated with team HQ position on turn 0/1?
     static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will update with TEAM_HQ_LOCATION based on mirroring
     static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //MapLocation object which holds where a robot spawned
     
@@ -152,27 +152,25 @@ public strictfp class RobotPlayer {
     //Code to run landscaper
     //Currently wan to build a wall around HQ
     static void runLandscaper() throws GameActionException {
-        if(turnCount < 600)
+    	Direction d = TEAM_HQ_LOCATION.directionTo(TEAM_HQ_LOCATION);
+        if(turnCount < 200)
         {
-        	for(int i = 0; i < 10; i ++)
+        	for(int i = 0; i < 5; i ++)
         	{
-        		rc.digDirt(Direction.SOUTH);
-        		System.out.print("DineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDineDine");
+        		tryMove(Direction.SOUTH);
         	}
-        	/*for(int a = 0; a < 25; a++)
+        }
+        if(turnCount < 250)
+        {
+        	for(int a = 0; a < 10; a++)
     		{
-    	 	rc.digDirt(Direction.SOUTH);
-    		}*/
-        	System.out.print("DOne");
-        	tryMove(Direction.EAST);
-        	tryMove(Direction.SOUTH);
-        	tryMove(Direction.SOUTH);
-        	tryMove(Direction.WEST);
-        	tryMove(Direction.WEST);
-        	tryMove(Direction.WEST);
-        	tryMove(Direction.WEST);
-        	tryMove(Direction.NORTH);
-        	tryMove(Direction.NORTH);
+        		rc.digDirt(Direction.SOUTH);
+        		System.out.println("Yuh");
+    		}
+        }
+       
+        	tryMove(d);
+   
         	/*for(int b = 0; b < 10; b++)
     		{
     		tryMove(Direction.NORTH);
@@ -181,7 +179,7 @@ public strictfp class RobotPlayer {
         	//TEAM_HQ_LOCATION;
     	
     		
-        }
+        
     }
     
     //Code to run delivery drones
