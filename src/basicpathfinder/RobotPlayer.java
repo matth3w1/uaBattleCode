@@ -27,9 +27,10 @@ public strictfp class RobotPlayer {
     static boolean[][] obstacles = new boolean[7][7];
     static boolean[][] checked = new boolean[7][7];
     static int[][] elevation = new int[7][7];
-    static MapLocation target;
+    static MapLocation target = new MapLocation(7,28);
     static int moveIndex = 0;
-    static Direction[] moves = new Direction[10]; 
+    static Direction[] moves = {Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER}; 
+    static boolean FollowingPath = false;
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
      * If this method returns, the robot dies!
@@ -78,8 +79,10 @@ public strictfp class RobotPlayer {
     	if(turnCount == 1) {
     		TEAM_HQ_LOCATION = rc.getLocation();
     		System.out.println("I am HQ located at " + TEAM_HQ_LOCATION);
+    		
     	}
-    	
+    	for (Direction dir : directions)
+               tryBuild(RobotType.MINER, dir);
     	if(TEAM_HQ_LOCATION.equals(new MapLocation(0, 0))) {
     		rc.resign();
     	}
@@ -90,7 +93,17 @@ public strictfp class RobotPlayer {
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
-    	
+    	if(FollowingPath) {
+    		followPath();
+    	}
+    	else {
+    		mapObstacles();
+    		createPath();
+    		FollowingPath = true;
+    		System.out.println("succesfully created a path?");
+    	}
+		
+    	/*
     	switch(objective) {
     		case 0: //Wander randomly and look for soup and refineries
     		
@@ -126,6 +139,7 @@ public strictfp class RobotPlayer {
     				rc.move(rc.getLocation().directionTo(targetLocation));
     			}
     	}
+    	*/
     } 
     
     //Code for the ref
@@ -275,50 +289,108 @@ public strictfp class RobotPlayer {
     	moveIndex++;
     	if(!(tryMove(moves[moveIndex]))) {
     		mapObstacles();
-    		createPath(target);
+    		createPath();
     	}
+    	System.out.println("Moved in Direction" + moves[moveIndex]);
     	
     }
+    
+    // If there is an Obstacle at that position, it will return false
+    // If there isn't, it will return true
+    // It begins but sensing nearby robots to detect positions of robots in its path
+    // It then goes through the loop and checks for flooding as well as finding elevation of the tile
     static void mapObstacles() throws GameActionException {
     	MapLocation currentLocation = rc.getLocation();
+    	int CurX = currentLocation.x;
+    	int CurY = currentLocation.y;
+    	System.out.println("in mapObstacles");
     	RobotInfo robots[];
     	if(rc.canSenseRadiusSquared(3)) {
     		robots = rc.senseNearbyRobots(3);
     		for(int i = 0; i < robots.length; i++) {
-    			int xCoord = 4+robots[i].getLocation().x-currentLocation.x;
-    			int yCoord = 4+robots[i].getLocation().y-currentLocation.y;
+    			int xCoord = 3+robots[i].getLocation().x-CurX;
+    			int yCoord = 3+CurY-robots[i].getLocation().y;
     			obstacles[xCoord][yCoord] = false;
     			checked[xCoord][yCoord] = true;
     		}
     	}
+    	// Sensing Robot Works ^
     	for(int i = -3; i < 4; i++) {
-    		for(int j = -3; i < 4; j++) {
+    		for(int j = -3; j < 4; j++) {
     			if(!checked[i+3][j+3]) {
     				MapLocation xy = rc.getLocation().translate(i, j);
         			if(!(rc.senseFlooding(xy))) {
-        				obstacles[i+3][j+3] = false;
+        				obstacles[i+3][j+3] = true;
         			}
-        			elevation[i][j] = rc.senseElevation(xy);
+        			elevation[i+3][j+3] = rc.senseElevation(xy);
+        			//System.out.println("Coordinate [" + xy.x + "," + xy.y + "]'s Elevation is " + elevation[i+3][j+3]);
     			}
     		}
     	}
+    	// Sensing Elevation Works ^
     }
-    static void createPath(MapLocation position) throws GameActionException {
-    	moveIndex = 0;
-    	MapLocation CloseLoc;
-    	int small = 1000;
+    
+    static void createPath() throws GameActionException {
+    	//System.out.println("in createPath");
+    	moveIndex = 0; // Resets move index for the array
+    	int CurX = 3; // Current Y position
+    	int CurY = 3; // Current X position
+    	int CloseX = target.x; // Used to find closest X
+    	int CloseY = target.y; // Used to find closest Y
+    	int small = 1000; // Used for distanceSquare calculations
+    	MapLocation CloseLoc = new MapLocation(20,20); // Location of the closest tile to final destination
+    	MapLocation CurLoc = rc.getLocation(); // Current Location of Robot
     	for(int i = -3; i < 4; i++) {
-    		for(int j = -3; i < 4; j++) {
+    		for(int j = -3; j < 4; j++) {
     			if(obstacles[i+3][j+3]) {
-    				MapLocation xy = rc.getLocation().translate(i, j);
-    				int temp = xy.distanceSquaredTo(position);
+    				MapLocation xy = CurLoc.translate(i, j);
+    				int temp = xy.distanceSquaredTo(target);
     				if(temp < small) {
     					small = temp;
     					CloseLoc = xy;
+    					CloseX = i;
+    					CloseY = j;
     				}
     			}
     		}
     	}
-    	
+    	//System.out.println("Closest Coordinate to Target is [" + CloseLoc.x + "," + CloseLoc.y + "]");
+    	// Closest Target Works ^
+    	Direction moveDir = CurLoc.directionTo(target);
+    	for(int i = 0; i < 10; i++) {
+    		if(CurX == CloseX && CurY == CloseY || moveDir == Direction.CENTER)
+    			i = 10;
+    		while(canMove(CurLoc, moveDir, CurX, CurY) == false) {
+    			moveDir = moveDir.rotateRight();
+    		}
+    		if(canMove(CurLoc, moveDir, CurX, CurY)) {
+    			MapLocation temp = CurLoc.add(moveDir);
+    			CurX += temp.x-CurLoc.x;
+    			CurY += CurLoc.y-temp.y;
+    			CurLoc = temp;
+    			//System.out.println("New Coordinate is [" + CurX + "," + CurY + "]");
+    		}
+    		moves[i] = moveDir;
+    		moveDir = CurLoc.directionTo(target);
+    		
+    		
+    	}	
+    }
+    
+    static boolean canMove(MapLocation loc, Direction dir, int CurrentX, int CurrentY) {
+    	MapLocation temp = loc.add(dir);
+    	int newX = CurrentX+temp.x-loc.x;
+    	int newY = CurrentY+loc.y-temp.y;
+//    	System.out.println(dir);
+//    	System.out.println(CurrentX);
+//    	System.out.println(CurrentY);
+//    	System.out.println(newX);
+//    	System.out.println(newY);
+//    	System.out.println(obstacles[newX][newY]);
+//    	System.out.println(Math.abs(elevation[CurrentX][CurrentY]-elevation[newX][newY]) < 4);
+    	if(obstacles[newX][newY] && Math.abs(elevation[CurrentX][CurrentY]-elevation[newX][newY]) < 4) {
+			return true;
+		}
+    	return false;
     }
 }

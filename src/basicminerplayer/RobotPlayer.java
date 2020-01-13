@@ -1,5 +1,8 @@
 package basicminerplayer;
 import battlecode.common.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Set;
 
 public strictfp class RobotPlayer {
     static RobotController rc;
@@ -10,16 +13,72 @@ public strictfp class RobotPlayer {
 
     static int turnCount;
     
-    static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will be updated with team HQ position on turn 0/1?
-    static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will update with TEAM_HQ_LOCATION based on mirroring
-    static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //MapLocation object which holds where a robot spawned
+    /**
+     * Private Instance Variables used by all robots (note - some may not be valid or used)
+     * 
+     * TEAM_HQ_LOCATION is MapLocation of where the team HQ is positioned
+     * ENEMEY_HQ_LOCATION is MapLocation of where the enemy HQ is positioned
+     * SPAWN_LOCATION is MapLocation of where this spesific unit has spawned
+     * 
+     * MAP_HEIGHT is an int which represents the map height
+     * MAP_WIDTH is an int which represents the map width
+     * 
+     * objective is a numerical representation of what the current robot wants to accomplish.  See objectives.txt to find objective description
+     * 
+     * targetLocation is MapLocation of where the current target
+     * INVALID_LOCATION is a constant used to replace null values for a location to keep the code happy (basically means no location)
+     * 
+     * transactionIdentifier is a number added to transactions to identify that transaction as from this team (encryption)
+     */
+    static MapLocation TEAM_HQ_LOCATION = new MapLocation(-1, -1);  
+    static MapLocation ENEMY_HQ_LOCATION = new MapLocation(-1, -1); 
+    static MapLocation SPAWN_LOCATION = new MapLocation(-1, -1); //can this be updates as the robot is created
     
-    static MapLocation ClosestRefinnery = new MapLocation(-1, -1);
+    static int MAP_HEIGHT = 0;
+    static int MAP_WIDTH = 0;
     
-    static MapLocation targetLocation = new MapLocation(0, 0); //MapLocation object which current robot will attempt to go to
+    //Maybe add a transaction array for the round one block for every robot to add to?
+    //Round 1 block will need more useful information for this to be useful
     
-    static int objective = 0; //int reperesenting objective of robot. 0 means no objective and other numbers represent other objectives.  Reference objectives.txt for number explinations
-    static int movement = 0; //int for how the robot should move.  If the robot is a building, ignored.  Reference movement.txt for kinds of movements
+    static int objective = 0; 
+    
+    static MapLocation targetLocation = new MapLocation(-1, -1);
+    static final MapLocation INVALID_LOCATION = new MapLocation(-1, -1);
+    
+    static int transactionIdentifier = 420; //Blaze it
+    
+    
+    /**
+     * Private Instance Variables only used by the Miner robot
+     * 
+     * MIN_SOUP_AMOUNT is the minimum amount of soup a tile must have so the miner goes toward that tile
+     * MIN_SOUP_DEPOSIT_AMOUNT is the minimum amount of soup a miner must collect before refining 
+     * 
+     * closestRefinery is a MapLocation of the last closest refinery.  New refinery are searched for every (4) rounds
+     * soupLocations is a key, value pair of loc, amount for all soup seen (or read) by a miner.  Continuous memory
+     * hasSpawnedRefinery is false until miner has spawned in a refinery.  Latches true
+     */
+    static final int MIN_SOUP_AMOUNT = 200;
+    static final int MIN_SOUP_DEPOSIT_AMOUNT = 100;
+    
+    static MapLocation closestRefinery = new MapLocation(-1, -1);
+    static HashMap<MapLocation, Integer> soupLocations = new HashMap<MapLocation, Integer>();
+    static boolean hasSpawnedRefinery = false;
+    
+    
+    /**
+     * Private instance Variables used by the HQ robot
+     * 
+     * numUnknownRobots is number of robots not identified within knownRobots
+     * 
+     * newMinerSoupThreshold is minimum amount of soup needed to spawn in a new miner.  Will update each round from HQ updating robots
+     * numMinersSpawned is number of miners spawned by the HQ starts at 2 from first round.  Used to decide to spawn more miners or not 
+     */
+    static int numUnknownRobots = 0;
+    
+    static int newMinerSoupThreshold = 300;
+    static int numMinersSpawned = 2;
+    
     
     //Need different variables to describe what the objective of current robot.  Ex miners want to go to soup unless they have too much
     //Also need to differentiate between robot types
@@ -37,14 +96,14 @@ public strictfp class RobotPlayer {
 
         turnCount = 0;
 
-        System.out.println("I'm a " + rc.getType() + " and I just got created!");
+        //System.out.println("I'm a " + rc.getType() + " and I just got created!");
         while (true) {
             turnCount += 1;
             // Try/catch blocks stop unhandled exceptions, which cause your robot to explode
             try {
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
-                System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
+                //System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
                 switch (rc.getType()) {
                     case HQ:                 runHQ();                break;
                     case MINER:              runMiner();             break;
@@ -69,13 +128,42 @@ public strictfp class RobotPlayer {
     
     //Code for the HQ
     static void runHQ() throws GameActionException {
-    	if(turnCount == 1) {
+    	
+    	if(turnCount == 1) { //First turn of the HQ
     		TEAM_HQ_LOCATION = rc.getLocation();
-    		System.out.println("I am HQ located at " + TEAM_HQ_LOCATION);
+    		MAP_HEIGHT = rc.getMapHeight();
+    		MAP_WIDTH = rc.getMapWidth();
+    		System.out.println(turnCount);
+    		System.out.println("I am the HQ located at " + TEAM_HQ_LOCATION);
+    		System.out.println("The map is " + MAP_HEIGHT + " by " + MAP_WIDTH);
+    		
+    		MapLocation maxSoupLocation = scanForSoup(rc.getCurrentSensorRadiusSquared());
+    		//System.out.println("The maximum amount of soup is located at (" + maxSoup.x + ", " + maxSoup.y + ")");
+    		int[] message = {TEAM_HQ_LOCATION.x, TEAM_HQ_LOCATION.y, maxSoupLocation.x, maxSoupLocation.y, 0, 0, transactionIdentifier}; //first two ints are the HQ xy pos and second are closest soup locations
+    		rc.submitTransaction(message, 1);
+    		
+    		if(maxSoupLocation.x != -1) { // If there is soup near, spawn closest to soup.  Otherwise go towards center of map
+    			//cnage these to tryBuild in case there is an unhandeled exception
+    			tryBuild(RobotType.MINER, TEAM_HQ_LOCATION.directionTo(maxSoupLocation));
+    			
+    		} else {
+    			tryBuild(RobotType.MINER, TEAM_HQ_LOCATION.directionTo(new MapLocation(MAP_WIDTH / 2, MAP_HEIGHT / 2)));
+    		}
+    		
     	}
     	
-    	if(TEAM_HQ_LOCATION.equals(new MapLocation(0, 0))) {
-    		rc.resign();
+    	//Scans the area for nearby robots
+    	//Scans the area for topography (high/low dirt walls and water)
+    	
+    	if(shouldSpawnMiner()) {
+    		Direction d = randomDirection();
+    		if(!(tryBuild(RobotType.MINER, d))) {
+    			if(!(tryBuild(RobotType.MINER, d.rotateLeft()))) {
+    				if(!(tryBuild(RobotType.MINER, d.rotateRight()))) {
+    					numMinersSpawned++;
+    				}
+    			}
+    		}
     	}
         
     }
@@ -84,45 +172,128 @@ public strictfp class RobotPlayer {
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
+    	System.out.println("Miner turn " + turnCount);
+    	System.out.println("Soup: " + rc.getSoupCarrying());
+    	System.out.println("Objective: " + objective);
     	
-    	switch(objective) {
-    		case 0: //Wander randomly and look for soup and refineries
+    	
+    	//First turn setup for nearest soup and blockchain
+    	if(turnCount == 1) {
+    		Transaction[] roundOneBlock = rc.getBlock(1);
+    		debugPrintTransactionBlock(roundOneBlock);
+    		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(roundOneBlock, rc.getTeam());
+    		int[] roundOneMessage = roundOneTeamBlock[0].getMessage();
     		
-    			Direction d;
-    			//Add check case if cooldown is greater than 1
-    			
-    			do {
-    				d  = randomDirection();
-    			} while(!(tryMove(d)));
-    			
-    			//Scans the area around miner for soup
-    			int maxSoup = -1;
-    			MapLocation maxSoupLocation = new MapLocation(-1, -1);
-    			for(int x = 5; x >= -5; x--) {
-    				for(int y = 5; y >= - 5; y--) {
-    					if(rc.canSenseLocation(rc.getLocation().translate(x, y))) {
-    						if(rc.senseSoup(rc.getLocation().translate(x, y)) > maxSoup) {
-    							maxSoupLocation = rc.getLocation().translate(x, y);
-    							maxSoup = rc.senseSoup(rc.getLocation().translate(x, y));
-    						}
-    					}
-    				}
+    		TEAM_HQ_LOCATION = new MapLocation(roundOneMessage[0], roundOneMessage[1]);
+    		MAP_HEIGHT = rc.getMapHeight();
+    		MAP_WIDTH = rc.getMapWidth();
+    		closestRefinery = TEAM_HQ_LOCATION;
+    		
+    		if(rc.getRoundNum() == 2) { //If this is the first miner spawned
+	    		targetLocation = new MapLocation(roundOneMessage[2], roundOneMessage[3]);
+	    		if(!(targetLocation.equals(INVALID_LOCATION))) { //If there is soup near the HQ
+	    			objective = 1;
+	    		} else { //No nearby soup so look for soup.  Go to center and look for soup
+	    			targetLocation = new MapLocation(rc.getMapHeight() / 2, rc.getMapWidth() / 2);
+	    			objective = 1;
+	    		}
+    		} else { //No nearby soup so look for soup.  Go to center and look for soup
+    			targetLocation = new MapLocation(rc.getMapHeight() / 2, rc.getMapWidth() / 2);
+    			objective = 1;
+    		}
+    	}
+    	
+    	
+    	//Add to and update the soupLocations Map
+    	//Currently uses ~7,000 bytecode
+    	//Should make more efficient later
+    	if(turnCount % 4 == 0) {
+    		advancedScanForSoup(rc.getCurrentSensorRadiusSquared());
+    		System.out.println("Updating Soup");
+    		System.out.println(soupLocations);
+    	}
+    	
+    	//update closest refinery
+    	if(turnCount % 4 == 1) {
+    		updateClosestRefinery();
+    		System.out.println("New CLosest Refinery");
+    		System.out.println(closestRefinery);
+    	}
+
+    	
+    	//Preform different actions based off of objective
+    	switch(objective) {
+    		case 0: //do nothing
+    		break;
+    		
+    		case 1: //Search for soup
+    			if(soupLocations.size() == 0) {
+    				//Wander around map looking for more
+    			} else {
+	    			
+	    			Set<MapLocation> locs = soupLocations.keySet();
+	    			int closestSoupDist = 500;
+	    			MapLocation closestSoup = INVALID_LOCATION;
+	    			
+	    			for(MapLocation loc : locs) {
+	    				if(rc.getLocation().distanceSquaredTo(loc) < closestSoupDist) {
+	    					closestSoupDist = rc.getLocation().distanceSquaredTo(loc);
+	    					closestSoup = loc;
+	    				}
+	    			}
+	    			
+	    			targetLocation = closestSoup;
+	    			objective = 2;
     			}
-		    	
-		    	
-		    	break;
-		    	
-    		case 1: //Goes to sensed food
+    			
+    		break;
+    		
+    		
+    		case 2: //Go to soup
+    			rc.setIndicatorLine(rc.getLocation(), targetLocation, 0, 255, 0);
     			
     			if(rc.getLocation().isAdjacentTo(targetLocation)) {
-    				objective = 2; //Sets objective to mining soup on adjacent tile
+    				if(rc.senseSoup(targetLocation) == 0) {
+    					soupLocations.remove(targetLocation);
+    					objective = 1;
+    				} else {
+    				objective = 3;
+    				tryMine(rc.getLocation().directionTo(targetLocation));
+    				}
     			} else {
-    				rc.move(rc.getLocation().directionTo(targetLocation));
+    				if(!(hasSpawnedRefinery) && turnCount % 5 == 0) {
+    					if(shouldSpawnRefinery()) {
+    						hasSpawnedRefinery = tryBuild(RobotType.REFINERY, randomDirection());
+    					}
+    				}
+    				moveToward(targetLocation);
     			}
+    		break;
+    		
+    		
+    		case 3: //Mine soup
+    			if(rc.getSoupCarrying() >= MIN_SOUP_DEPOSIT_AMOUNT) { // Carrying enough soup
+    				objective = 4;
+    				moveToward(closestRefinery);
+    			} else if(!(tryMine(rc.getLocation().directionTo(targetLocation)))) { //Mining is innefective and not enough soup
+    				objective = 1;
+    			}
+    		break;
+    		
+    		
+    		case 4: //Move to refinery and then deposit
+    			if(rc.getLocation().isAdjacentTo(closestRefinery)) {
+    				if(tryRefine(rc.getLocation().directionTo(closestRefinery)))
+    					objective = 1;
+    			} else {
+    				moveToward(closestRefinery);
+    			}
+    			
+    			
     	}
     } 
-    
-    //Code for the ref
+
+	//Code for the ref
     static void runRefinery() throws GameActionException {
         // System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()));
     }
@@ -232,7 +403,8 @@ public strictfp class RobotPlayer {
      * @throws GameActionException
      */
     static boolean tryMine(Direction dir) throws GameActionException {
-        if (rc.isReady() && rc.canMineSoup(dir)) {
+    	System.out.println(turnCount);
+        if (rc.isReady() && rc.canMineSoup(dir) && rc.senseSoup(rc.getLocation().add(dir)) != 0) {
             rc.mineSoup(dir);
             return true;
         } else return false;
@@ -263,5 +435,203 @@ public strictfp class RobotPlayer {
                 rc.submitTransaction(message, 10);
         }
         // System.out.println(rc.getRoundMessages(turnCount-1));
+    }
+    
+
+    /**
+     * Scans the area for the highest amount of soup
+     * 
+     * @param None
+     * @return MapLocation of the highest amount of soup
+     * @throws GameActionException
+     */
+    static MapLocation scanForSoup(int radius) throws GameActionException {
+    	int maxSoup = 0;
+    	MapLocation maxSoupLocation = new MapLocation(-1, -1); 
+    	
+    	int rootRadius = (int) Math.floor(Math.sqrt(radius));
+    	
+    	for(int x = -rootRadius; x <= rootRadius; x++) {
+    		for(int y = -rootRadius; y <= rootRadius; y++) {
+    			//System.out.println(x + " " + y);
+    			if(rc.canSenseLocation(rc.getLocation().translate(x, y))) {
+    				if(rc.senseSoup(rc.getLocation().translate(x, y)) > maxSoup && !(rc.senseFlooding(rc.getLocation().translate(x, y)))) {
+    					maxSoup = rc.senseSoup(rc.getLocation().translate(x, y));
+    					maxSoupLocation = rc.getLocation().translate(x, y);
+    				}
+    			}
+    		}
+    	}
+    	return maxSoupLocation;
+    }
+    
+    /**
+     * Scans the area for soup, adding locations to an Map<loc, amount>
+     * @param radius
+     * @return
+     * @throws GameActionException
+     */
+    static void advancedScanForSoup(int radius) throws GameActionException { 	
+    	int rootRadius = (int) Math.floor(Math.sqrt(radius));
+    	
+    	searchloop:
+    	for(int x = -rootRadius; x <= rootRadius; x++) {
+    		for(int y = -rootRadius; y <= rootRadius; y++) {
+    			//System.out.println(x + " " + y);
+    			MapLocation testLoc = rc.getLocation().translate(x, y);
+    			if(rc.canSenseLocation(testLoc)) {
+    				if(rc.senseFlooding(testLoc) || rc.senseSoup(testLoc) == 0) {
+    					soupLocations.remove(testLoc);
+    				} else if(soupLocations.containsKey(testLoc)){
+    					soupLocations.replace(testLoc, rc.senseSoup(testLoc));
+    				} else {
+    					soupLocations.put(testLoc, rc.senseSoup(testLoc));
+    				}
+    			}
+    			if(soupLocations.size() > 5) {
+    				break searchloop;
+    			}
+    		}
+    	}
+    }
+    
+    /**
+     * Moves toward the objective location 
+     * 
+     * @param loc to move toward
+     * @return true if the movement was performed
+     * @throws GameActionException
+     */
+    static boolean moveToward(MapLocation loc) throws GameActionException {
+    	Direction dir = rc.getLocation().directionTo(loc);
+    	
+    	if(!(rc.senseFlooding(rc.getLocation().add(dir))) && rc.canMove(dir)) {
+    		rc.move(dir);
+    		return true;
+    	}
+    	return false;
+    }
+    
+    /**
+     * Finds the nearest type of robot
+     * 
+     * @param type of robot to look for
+     * @return MapLocation of the robot, -1, -1 otherwise (invalid MapLocation)
+     * @throws GameActionException
+     */
+    static MapLocation findNearestRobotType(RobotType type) {
+    	RobotInfo[] robots = rc.senseNearbyRobots();
+    	for(RobotInfo robot : robots) {
+    		if(robot.type.equals(type)) {
+    			return robot.location;
+    		}
+    	}
+    	return INVALID_LOCATION;
+    }
+    
+    /**
+     * Finds the nearest type of robot
+     * 
+     * @param type of robot to look for and which team
+     * @return MapLocation of the robot, invalid otherwise
+     * @throws GameActionException
+     */
+    static MapLocation findNearestRobotTypeOnTeam(RobotType type, Team team) {
+    	RobotInfo[] robots = rc.senseNearbyRobots();
+    	for(RobotInfo robot : robots) {
+    		if(robot.type.equals(type) && robot.team.equals(team)) {
+    			return robot.location;
+    		}
+    	}
+    	return INVALID_LOCATION;
+    }
+    
+    /**
+     * Prints off block of transactions
+     * 
+     * @param array of transactions
+     * @throws GameActionException
+     */
+    static void debugPrintTransactionBlock(Transaction[] block) throws GameActionException {
+    	for(Transaction trans : block) {
+			for(int test : trans.getMessage()) {
+				System.out.print(test + ", ");
+			}
+			System.out.println();
+		}
+    }
+    
+    /**
+     * Verifies a message is from our team
+     * 
+     * @param message (int array) to be verified
+     * @returns true if the message is from our team, false otherwise
+     * @throws GameActionException
+     */
+    static boolean verifyMessage(int[] message) throws GameActionException {
+    	//Implement later
+    	return(message[6] == transactionIdentifier);
+    }
+    
+    /**
+     * Returns transactions from a specific team from an array of transactions (block)
+     * 
+     * @param block of transactions and team
+     * @returns block of transactions from specific team
+     * @throws GameActionException
+     */
+    static Transaction[] seperateTransactionsFromTeam(Transaction[] block, Team team) throws GameActionException {
+    	Transaction[] teamBlock = new Transaction[7];
+    	int teamBlockIndex = 0;
+    	
+    	for(int i = 0; i < block.length; i++) {
+    		if(verifyMessage(block[i].getMessage())) {
+    			teamBlock[teamBlockIndex++] = block[i];
+    		}
+    	}
+    	
+    	return teamBlock;
+    }
+    
+    /**
+     * Decided if a miner should be spawned based off of current game parameters
+     * 
+     * @param numMiners
+     * @return true if algorithm dictates new miner
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnMiner() throws GameActionException {
+    	//Make more advanced later
+    	if(numMinersSpawned > 5)
+    		return false;
+    	return true;
+    }
+    
+    /**
+     * Scans the nearby area for team refineries
+     * 
+     * @param none
+     * @return true if closest refinery has been updated, false otherwise
+     * @throws GameActionEception
+     */
+    static boolean updateClosestRefinery() throws GameActionException {
+    	if(findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam()).equals(INVALID_LOCATION)) {
+    		return false;
+    	}
+    	closestRefinery = findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam());
+    	return true;
+    }
+    
+    /**
+     * Decides if a miner should create a refienry based off of current game parameters
+     * 
+     * @return true if a refinery should be spawned
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnRefinery() throws GameActionException {
+    	if(rc.getLocation().distanceSquaredTo(TEAM_HQ_LOCATION) > 25 && rc.getLocation().distanceSquaredTo(targetLocation) > 25) {
+    		return true;
+    	}
+    	return false;
     }
 }
