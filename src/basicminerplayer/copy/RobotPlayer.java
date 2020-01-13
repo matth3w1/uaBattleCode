@@ -124,6 +124,11 @@ public strictfp class RobotPlayer {
     				rc.move(rc.getLocation().directionTo(targetLocation));
     			}
     	}*/
+    	MapLocation miners = rc.getLocation();
+    	if(miners.isWithinDistanceSquared(TEAM_HQ_LOCATION, 16))
+    	{
+    		tryMove(randomDirection());
+    	}
     	tryBuild(RobotType.DESIGN_SCHOOL, Direction.EAST);
     } 
     
@@ -140,8 +145,10 @@ public strictfp class RobotPlayer {
     //Code for the des school
     static void runDesignSchool() throws GameActionException {
 
+    	if(turnCount < 200)	
+    	{
     		tryBuild(RobotType.LANDSCAPER, Direction.EAST);
-    	
+    	}
     }
     
     //Code for the ful center
@@ -152,25 +159,33 @@ public strictfp class RobotPlayer {
     //Code to run landscaper
     //Currently wan to build a wall around HQ
     static void runLandscaper() throws GameActionException {
-    	Direction d = TEAM_HQ_LOCATION.directionTo(TEAM_HQ_LOCATION);
-        if(turnCount < 200)
-        {
-        	for(int i = 0; i < 5; i ++)
+    	MapLocation[] adjacent = {TEAM_HQ_LOCATION.add(Direction.NORTH), TEAM_HQ_LOCATION.add(Direction.SOUTH), TEAM_HQ_LOCATION.add(Direction.EAST), TEAM_HQ_LOCATION.add(Direction.WEST)};
+    	MapLocation landscaper = rc.getLocation();
+    	Direction d = landscaper.directionTo(TEAM_HQ_LOCATION);
+    	if(rc.getDirtCarrying() == 0)
+    	{
+        	for(int i = 0; i < 10; i ++)
         	{
         		tryMove(Direction.SOUTH);
         	}
-        }
-        if(turnCount < 250)
-        {
-        	for(int a = 0; a < 10; a++)
+        	for(int a = 0; a < 25; a++)
     		{
         		rc.digDirt(Direction.SOUTH);
         		System.out.println("Yuh");
     		}
-        }
-       
-        	tryMove(d);
-   
+    	}
+    	tryMove(d);
+    	for(MapLocation h: adjacent)
+    	{
+    		Direction g = landscaper.directionTo(h);
+    		tryMove(g);
+    		for(int b = 0; b < 3; b++)
+    		{
+    			rc.depositDirt(Direction.CENTER);
+    		}
+    	}
+    	
+    	
         	/*for(int b = 0; b < 10; b++)
     		{
     		tryMove(Direction.NORTH);
