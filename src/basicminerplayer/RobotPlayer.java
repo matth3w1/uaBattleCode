@@ -211,14 +211,14 @@ public strictfp class RobotPlayer {
     	System.out.println("Miner turn " + turnCount);
     	System.out.println("Soup: " + rc.getSoupCarrying());
     	System.out.println("Objective: " + objective);
-    	System.out.println("B Length: " + lastRoundBlock.length);
+    	if(lastRoundBlock.length != 0) {
+    		System.out.println("Block: ");
+    		debugPrintTransactionBlock(lastRoundBlock);
+    	}
     	
     	updateTransIdent();
     	getLastBlock();
-    	
-    	debugPrintTransactionBlock(lastRoundBlock);
-    	
-    	
+    
     	//First turn setup for nearest soup and blockchain
     	if(turnCount == 1) {
     		Transaction[] firstRoundBlock = rc.getBlock(1);
@@ -248,7 +248,7 @@ public strictfp class RobotPlayer {
     	//Add to and update the soupLocations Map
     	//Currently uses ~7,000 bytecode
     	//Should make more efficient later
-    	if(turnCount % 4 == 0) {
+    	if(turnCount % 12 == 0) {
     		advancedScanForSoup(rc.getCurrentSensorRadiusSquared());
     		System.out.println("Updating Soup");
     		System.out.println(soupLocations);
@@ -355,6 +355,8 @@ public strictfp class RobotPlayer {
          	Team team = rc.getTeam();
          	Team opponent = team.opponent();
     	 }
+    	
+    	
 
     }
 
@@ -691,7 +693,7 @@ public strictfp class RobotPlayer {
     					soupLocations.put(testLoc, rc.senseSoup(testLoc));
     				}
     			}
-    			if(soupLocations.size() > 5) {
+    			if(soupLocations.size() > 3) {
     				break searchloop;
     			}
     		}
