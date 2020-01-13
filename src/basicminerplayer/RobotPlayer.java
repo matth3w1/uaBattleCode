@@ -116,8 +116,7 @@ public strictfp class RobotPlayer {
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
                 //System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
-            	updateTransIdent();
-            	getLastBlock();
+            	
                 switch (rc.getType()) {
                     case HQ:                 runHQ();                break;
                     case MINER:              runMiner();             break;
@@ -142,6 +141,9 @@ public strictfp class RobotPlayer {
     
     //Code for the HQ
     static void runHQ() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
+    	
     	
     	if(turnCount == 1) { //First turn of the HQ
     		TEAM_HQ_LOCATION = rc.getLocation();
@@ -164,6 +166,9 @@ public strictfp class RobotPlayer {
     			tryBuild(RobotType.MINER, TEAM_HQ_LOCATION.directionTo(new MapLocation(MAP_WIDTH / 2, MAP_HEIGHT / 2)));
     		}
     		
+    	} else if(turnCount % 2 == 0) {
+    		rc.submitTransaction(new int[] {666, 666, 666, 666, 666, 420},  1);
+    		
     	}
     	
     	//Scans the area for nearby robots
@@ -178,16 +183,16 @@ public strictfp class RobotPlayer {
     		}
     	}
     	
-    	if(shouldSpawnMiner()) {
-    		Direction d = randomDirection();
-    		if(!(tryBuild(RobotType.MINER, d))) {
-    			if(!(tryBuild(RobotType.MINER, d.rotateLeft()))) {
-    				if(!(tryBuild(RobotType.MINER, d.rotateRight()))) {
-    					numMinersSpawned++;
-    				}
-    			}
-    		}
-    	}
+//    	if(shouldSpawnMiner()) {
+//    		Direction d = randomDirection();
+//    		if(!(tryBuild(RobotType.MINER, d))) {
+//    			if(!(tryBuild(RobotType.MINER, d.rotateLeft()))) {
+//    				if(!(tryBuild(RobotType.MINER, d.rotateRight()))) {
+//    					numMinersSpawned++;
+//    				}
+//    			}
+//    		}
+//    	}
         
     }
 
@@ -195,16 +200,23 @@ public strictfp class RobotPlayer {
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
-    	System.out.println("Miner turn " + turnCount);
-    	System.out.println("Soup: " + rc.getSoupCarrying());
-    	System.out.println("Objective: " + objective);
+//    	System.out.println("Miner turn " + turnCount);
+//    	System.out.println("Soup: " + rc.getSoupCarrying());
+//    	System.out.println("Objective: " + objective);
+//    	System.out.println("B Length: " + lastRoundBlock.length);
+    	
+    	updateTransIdent();
+    	getLastBlock();
+    	
+    	if(lastRoundBlock.length != 1) {
+    		debugPrintTransactionBlock(lastRoundBlock);
+    	}
     	
     	
     	//First turn setup for nearest soup and blockchain
     	if(turnCount == 1) {
-    		Transaction[] roundOneBlock = rc.getBlock(1);
-    		debugPrintTransactionBlock(roundOneBlock);
-    		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(roundOneBlock, 1, rc.getTeam());
+    		Transaction[] firstRoundBlock = rc.getBlock(1);
+    		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(firstRoundBlock, 1, rc.getTeam());
     		int[] roundOneMessage = roundOneTeamBlock[0].getMessage();
     		
     		TEAM_HQ_LOCATION = new MapLocation(roundOneMessage[0], roundOneMessage[1]);
@@ -319,36 +331,50 @@ public strictfp class RobotPlayer {
 	//Code for the ref
     static void runRefinery() throws GameActionException {
         // System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()));
+    	updateTransIdent();
+    	getLastBlock();
     }
     
     //Code for the vap
     static void runVaporator() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
 
     }
 
     //Code for the des school
     static void runDesignSchool() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
 
     }
     
     //Code for the ful center
     static void runFulfillmentCenter() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
 
     }
     
     //Code to run landscaper
     //Currently wan to build a wall around HQ
     static void runLandscaper() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
 
     }
     
     //Code to run delivery drones
     static void runDeliveryDrone() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
        
     }
 
     //code to run net gun
     static void runNetGun() throws GameActionException {
+    	updateTransIdent();
+    	getLastBlock();
     	
     	//Scan for enemy drones and shoot them down
     	RobotInfo[] enemyRobots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), rc.getTeam().opponent());
@@ -430,7 +456,7 @@ public strictfp class RobotPlayer {
      * @throws GameActionException
      */
     static boolean tryMine(Direction dir) throws GameActionException {
-    	System.out.println(turnCount);
+    	//System.out.println(turnCount);
         if (rc.isReady() && rc.canMineSoup(dir) && rc.senseSoup(rc.getLocation().add(dir)) != 0) {
             rc.mineSoup(dir);
             return true;
@@ -584,7 +610,7 @@ public strictfp class RobotPlayer {
 			for(int test : trans.getMessage()) {
 				System.out.print(test + ", ");
 			}
-			System.out.println();
+			System.out.println("Cost: " + trans.getCost());
 		}
     }
     
@@ -596,7 +622,8 @@ public strictfp class RobotPlayer {
      * @throws GameActionException
      */
     static void updateTransIdent() throws GameActionException {
-    	transIdent = transIdent + (rc.getRoundNum() * 7);
+    	//Implement later
+    	transIdent = transIdent;
     }
     
     /**
@@ -607,7 +634,7 @@ public strictfp class RobotPlayer {
      * @throws GameActionException
      */
     static boolean verifyMessage(int[] message, int roundNum) throws GameActionException {
-    	return(message[6] == transIdent - (7*(rc.getRoundNum() - roundNum)));
+    	return(message[6] == transIdent);
     }
     
     /**
