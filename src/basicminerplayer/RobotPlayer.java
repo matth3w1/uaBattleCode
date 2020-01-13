@@ -218,6 +218,11 @@ public strictfp class RobotPlayer {
     	
     	updateTransIdent();
     	getLastBlock();
+    	if(lastRoundBlock.length != 0) {
+	    	for(Transaction trans : seperateTransactionsFromTeam(lastRoundBlock, 1,  rc.getTeam())) {
+	    		decodeMessage(trans.getMessage());
+	    	}
+    	}
     
     	//First turn setup for nearest soup and blockchain
     	if(turnCount == 1) {
@@ -260,6 +265,13 @@ public strictfp class RobotPlayer {
     		System.out.println("New CLosest Refinery");
     		System.out.println(closestRefinery);
     	}
+    	
+    	if(turnCount > 200 && turnCount % 35 == 3 && rc.getLocation().distanceSquaredTo(TEAM_HQ_LOCATION) > 37 && rc.senseNearbyRobots().length < 8) {
+    		for(Direction d : directions) {
+    			tryBuild(randomSpawnedByMiner(), d);
+    		}
+    		
+    	}
 
     	
     	//Preform different actions based off of objective
@@ -269,7 +281,7 @@ public strictfp class RobotPlayer {
     		
     		case 1: //Search for soup
     			if(soupLocations.size() == 0) {
-    				moveToward(targetLocation);
+    				tryMove(randomDirection());
     			} else {
 	    			
 	    			Set<MapLocation> locs = soupLocations.keySet();
@@ -369,6 +381,18 @@ public strictfp class RobotPlayer {
          	Team team = rc.getTeam();
          	Team opponent = team.opponent();
     	 }
+    	
+    	if(turnCount % 15 == 0) {
+    		if(rc.getTeamSoup() >= 500) {
+    			for(Direction d : directions) {
+    				if(rc.canBuildRobot(RobotType.LANDSCAPER, d)) {
+    					rc.buildRobot(RobotType.LANDSCAPER, d);
+    				}
+    			}
+    				
+    		}
+    	}
+    		
 
     }
     
@@ -381,6 +405,17 @@ public strictfp class RobotPlayer {
          	Team team = rc.getTeam();
          	Team opponent = team.opponent();
     	 }
+    	 
+    	 if(turnCount % 15 == 0) {
+     		if(rc.getTeamSoup() >= 500) {
+     			for(Direction d : directions) {
+     				if(rc.canBuildRobot(RobotType.DELIVERY_DRONE, d)) {
+     					rc.buildRobot(RobotType.DELIVERY_DRONE, d);
+     				}
+     			}
+     				
+     		}
+     	}
 
     }
     
@@ -390,9 +425,66 @@ public strictfp class RobotPlayer {
     	updateTransIdent();
     	getLastBlock();
     	
-    	 if(turnCount==1) {
-         	Team team = rc.getTeam();
-            Team opponent = team.opponent();
+    	 if(turnCount == 1) {
+    		Team team = rc.getTeam();
+          	Team opponent = team.opponent();
+          	
+     		Transaction[] firstRoundBlock = rc.getBlock(1);
+     		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(firstRoundBlock, 1, rc.getTeam());
+     		int[] roundOneMessage = roundOneTeamBlock[0].getMessage();
+     		
+     		TEAM_HQ_LOCATION = new MapLocation(roundOneMessage[0], roundOneMessage[1]);
+     		MAP_HEIGHT = rc.getMapHeight();
+     		MAP_WIDTH = rc.getMapWidth();
+     		
+     		targetLocation = new MapLocation(MAP_HEIGHT / 2, MAP_WIDTH / 2);
+     		
+    	 }
+    	 
+    	 switch(objective) {
+    	 
+    	 	case 0: //Do nothing =
+    	 	break;
+    	 	
+    	 	case 1: //mine dirt
+    	 		if(rc.getDirtCarrying() == 25) {
+    	 			objective = 2;
+    	 			if(!(ENEMY_HQ_LOCATION.equals(INVALID_LOCATION))) {
+    	 				targetLocation = ENEMY_HQ_LOCATION;
+    	 			} else {
+    	 				targetLocation = new MapLocation(MAP_WIDTH - TEAM_HQ_LOCATION.x, MAP_HEIGHT - TEAM_HQ_LOCATION.y);
+    	 			}
+    	 			moveToward(targetLocation);
+    	 		} else {
+    	 			for(Direction d : directions) {
+    	 				if(tryMine(d)) {
+    	 					break;
+    	 				}
+    	 			}
+    	 		}
+    	 		
+    	 	break;
+    	 	
+    	 	case 2: //go to target location
+    	 		if(rc.getLocation().isAdjacentTo(targetLocation)) {
+    	 			if(findNearestRobotTypeOnTeam(RobotType.HQ, rc.getTeam().opponent()).equals(targetLocation)) {
+    	 				objective = 3;
+    	 			} else {
+    	 				targetLocation = randomLocation();
+    	 			}
+    	 		} else {
+    	 			moveToward(targetLocation);
+    	 		}
+    	 		
+    	 	break;
+    	 	
+    	 	case 3: //place dirt on target
+    	 		if(rc.getDirtCarrying() == 0) {
+    	 			tryMine(rc.getLocation().directionTo(targetLocation).rotateRight().rotateRight());
+    	 		} else {
+    	 			rc.depositDirt(rc.getLocation().directionTo(targetLocation));
+    	 		}
+    	 	break;
     	 }
 
     }
@@ -413,22 +505,40 @@ public strictfp class RobotPlayer {
             break;
                 
             case 1: //determine enemy bot to carry and move to it
-                RobotInfo[] nearbyBots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), opponentTeam);
-                if(nearbyBots.length == 0){
-                    tryMove(randomDirection());
-                } else {
-                	for(RobotInfo robot : nearbyBots) {
-                		if(robot.getType().equals(RobotType.MINER) || robot.getType().equals(RobotType.LANDSCAPER)) {
-                			//Add in try to pickup and move towards
-                		}
-                	}
-                }
+            	tryMove(randomDirection());
+            	
+            	if(turnCount % 4 == 0) {
+	                RobotInfo[] nearbyBots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), opponentTeam);
+	                if(nearbyBots.length != 0) {
+	                	for(RobotInfo robot : nearbyBots) {
+	                		if(robot.getType().equals(RobotType.MINER) || robot.getType().equals(RobotType.LANDSCAPER)) {
+	                			if(rc.canPickUpUnit(robot.ID)) {
+	                				rc.canPickUpUnit(robot.ID);
+	                				objective = 2;
+	                			} else {
+	                				targetLocation = robot.location;
+	                			}
+	                		}
+	                	}
+	                }
+	                moveToward(targetLocation);
+	                moveToward(targetLocation);
+            	}
                 
                 
                 
                 
             case 2: //Find water and drop
-                MapLocation targetLocation = scanForNearbyWater();
+            	if(turnCount % 4 == 0) {
+            		MapLocation targetLocation = scanForNearbyWater();
+            	}
+                
+                if(rc.getLocation().isAdjacentTo(targetLocation)) {
+                	if(rc.canDropUnit(rc.getLocation().directionTo(targetLocation))) {
+                		rc.dropUnit(rc.getLocation().directionTo(targetLocation));
+                		objective = 1;
+                	}
+                }
                 
                 // Add in pathfinding
             case 3:
@@ -629,7 +739,7 @@ public strictfp class RobotPlayer {
     static boolean shouldSpawnMiner() throws GameActionException {
     	System.out.print("Spawned Miners: " + numMinersSpawned);
     	//Make more advanced later
-    	if(rc.getTeamSoup() >= 200 && numMinersSpawned < 4) {
+    	if(rc.getTeamSoup() >= 200 && numMinersSpawned < 12) {
     		System.out.println("True");
     		return true;
     	}
