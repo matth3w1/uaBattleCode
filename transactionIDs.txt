@@ -1,0 +1,11 @@
+Index  |  Description
+
+0	  Message Type
+1-5	  Message Data
+6	  Message key
+
+
+--------------------------
+Type  |  Description
+1	 Enemy HQ Location spotted, 2 - HQ.x, 3 - HQ.y
+2	 Landscaper ready to be picked up by drone, 2 - Landscaper.x, 3 - Landscaper.y

@@ -1,5 +1,6 @@
 package basicminerplayer;
 import battlecode.common.*;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Set;
@@ -166,9 +167,6 @@ public strictfp class RobotPlayer {
     			tryBuild(RobotType.MINER, TEAM_HQ_LOCATION.directionTo(new MapLocation(MAP_WIDTH / 2, MAP_HEIGHT / 2)));
     		}
     		
-    	} else if(turnCount % 2 == 0) {
-    		rc.submitTransaction(new int[] {666, 666, 666, 666, 666, 420},  1);
-    		
     	}
     	
     	//Scans the area for nearby robots
@@ -183,16 +181,14 @@ public strictfp class RobotPlayer {
     		}
     	}
     	
-//    	if(shouldSpawnMiner()) {
-//    		Direction d = randomDirection();
-//    		if(!(tryBuild(RobotType.MINER, d))) {
-//    			if(!(tryBuild(RobotType.MINER, d.rotateLeft()))) {
-//    				if(!(tryBuild(RobotType.MINER, d.rotateRight()))) {
-//    					numMinersSpawned++;
-//    				}
-//    			}
-//    		}
-//    	}
+    	//Code for spawning in miner
+    	if(shouldSpawnMiner()) {
+    		for(Direction d : directions)
+    		if(tryBuild(RobotType.MINER, d)) {
+    			numMinersSpawned++;
+    			break;
+    		}
+    	}
         
     }
 
@@ -200,17 +196,15 @@ public strictfp class RobotPlayer {
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
-//    	System.out.println("Miner turn " + turnCount);
-//    	System.out.println("Soup: " + rc.getSoupCarrying());
-//    	System.out.println("Objective: " + objective);
-//    	System.out.println("B Length: " + lastRoundBlock.length);
+    	System.out.println("Miner turn " + turnCount);
+    	System.out.println("Soup: " + rc.getSoupCarrying());
+    	System.out.println("Objective: " + objective);
+    	System.out.println("B Length: " + lastRoundBlock.length);
     	
     	updateTransIdent();
     	getLastBlock();
     	
-    	if(lastRoundBlock.length != 1) {
-    		debugPrintTransactionBlock(lastRoundBlock);
-    	}
+    	debugPrintTransactionBlock(lastRoundBlock);
     	
     	
     	//First turn setup for nearest soup and blockchain
@@ -224,7 +218,7 @@ public strictfp class RobotPlayer {
     		MAP_WIDTH = rc.getMapWidth();
     		closestRefinery = TEAM_HQ_LOCATION;
     		
-    		if(rc.getRoundNum() == 2) { //If this is the first miner spawned
+    		if(rc.getRoundNum() < 5) { //If this is the first miner spawned
 	    		targetLocation = new MapLocation(roundOneMessage[2], roundOneMessage[3]);
 	    		if(!(targetLocation.equals(INVALID_LOCATION))) { //If there is soup near the HQ
 	    			objective = 1;
@@ -263,7 +257,7 @@ public strictfp class RobotPlayer {
     		
     		case 1: //Search for soup
     			if(soupLocations.size() == 0) {
-    				//Wander around map looking for more
+    				moveToward(targetLocation);
     			} else {
 	    			
 	    			Set<MapLocation> locs = soupLocations.keySet();
@@ -432,6 +426,23 @@ public strictfp class RobotPlayer {
             return true;
         } else return false;
     }
+    
+    /**
+     * Moves toward the objective location 
+     * 
+     * @param loc to move toward
+     * @return true if the movement was performed
+     * @throws GameActionException
+     */
+    static boolean moveToward(MapLocation loc) throws GameActionException {
+    	Direction dir = rc.getLocation().directionTo(loc);
+    	
+    	if(!(rc.senseFlooding(rc.getLocation().add(dir))) && rc.canMove(dir)) {
+    		rc.move(dir);
+    		return true;
+    	}
+    	return false;
+    }
 
     /**
      * Attempts to build a given robot in a given direction.
@@ -476,21 +487,81 @@ public strictfp class RobotPlayer {
             return true;
         } else return false;
     }
-
-
-    static void tryBlockchain() throws GameActionException {
-        if (turnCount < 3) {
-            int[] message = new int[10];
-            for (int i = 0; i < 10; i++) {
-                message[i] = 123;
-            }
-            if (rc.canSubmitTransaction(message, 10))
-                rc.submitTransaction(message, 10);
-        }
-        // System.out.println(rc.getRoundMessages(turnCount-1));
+    
+    /**
+     * Decided wether or not to spawn in a design school
+     * 
+     * @param none
+     * @returns ture if design school should be created
+     * @throws GameActionException
+     */
+    static boolean shoudlSpawnDesignSchool() throws GameActionException {
+    	//Implement
+    	return false;
     }
     
-
+    /**
+     * Decided if a vaparator should be spawned
+     * @return true if a vaparator should be spawned 
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnVaparator() throws GameActionException {
+    	//Implement
+    	return false;
+    }
+    
+    /**
+     * Decided if a net gun should be spawned
+     * 
+     * @return true if a net gun should be spawned
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnNetGun() throws GameActionException {
+    	//Implement
+    	return false;
+    }
+    
+    /**
+     * Decided if a furfillment center should be spawned
+     * 
+     * @return true if a furfillment center should be spawned
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnCenter() throws GameActionException {
+    	//Implement
+    	return false;
+    }
+    
+    /**
+     * Decided if a miner should be spawned based off of current game parameters
+     * 
+     * @param numMiners
+     * @return true if algorithm dictates new miner
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnMiner() throws GameActionException {
+    	System.out.print("Spawned Miners: " + numMinersSpawned);
+    	//Make more advanced later
+    	if(rc.getTeamSoup() >= 200 && numMinersSpawned < 4) {
+    		System.out.println("True");
+    		return true;
+    	}
+    	return false;
+    }
+    
+    /**
+     * Decides if a miner should create a refienry based off of current game parameters
+     * 
+     * @return true if a refinery should be spawned
+     * @throws GameActionException
+     */
+    static boolean shouldSpawnRefinery() throws GameActionException {
+    	if(rc.getLocation().distanceSquaredTo(TEAM_HQ_LOCATION) < 50) {
+    		return false;
+    	}
+    	return true;
+    }
+    
     /**
      * Scans the area for the highest amount of soup
      * 
@@ -549,20 +620,23 @@ public strictfp class RobotPlayer {
     }
     
     /**
-     * Moves toward the objective location 
+     * Scans the area for all nearby enemy robots and does stuff based off of what they find
      * 
-     * @param loc to move toward
-     * @return true if the movement was performed
-     * @throws GameActionException
+     * @param none
+     * @returns none
+     * @throws GameActonException 
      */
-    static boolean moveToward(MapLocation loc) throws GameActionException {
-    	Direction dir = rc.getLocation().directionTo(loc);
+    static void scanForEnemyRobots() throws GameActionException {
+    	RobotInfo[] robots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), rc.getTeam().opponent());
     	
-    	if(!(rc.senseFlooding(rc.getLocation().add(dir))) && rc.canMove(dir)) {
-    		rc.move(dir);
-    		return true;
+    	for(RobotInfo robot : robots) {
+    		if(robot.getType().equals(RobotType.HQ)) {
+    			int[] message = {1, robot.getLocation().x, robot.getLocation().y, 1, 0, 0, transIdent};
+    			if(rc.canSubmitTransaction(message, 10)) {
+    				rc.submitTransaction(message, 10);
+    			}
+    		}
     	}
-    	return false;
     }
     
     /**
@@ -627,6 +701,22 @@ public strictfp class RobotPlayer {
     }
     
     /**
+     * Updates the lastRoundBlock to whatever messages were send to the blockchain
+     * 
+     * @param none
+     * @return none
+     * @throws GameActionException
+     */
+    static void getLastBlock() throws GameActionException {
+    	try {
+    		lastRoundBlock = rc.getBlock(rc.getRoundNum() - 1);
+    	} catch(GameActionException e) {
+    		System.out.println("Something went wrong");
+    		System.out.println("Probably no block to get");
+    	}
+    }
+    
+    /**
      * Verifies a message is from our team
      * 
      * @param message (int array) to be verified
@@ -658,17 +748,18 @@ public strictfp class RobotPlayer {
     }
     
     /**
-     * Decided if a miner should be spawned based off of current game parameters
+     * Decodes the given message and preforms the tasks described
      * 
-     * @param numMiners
-     * @return true if algorithm dictates new miner
+     * @param int[] message to be decoded
+     * @returns none
      * @throws GameActionException
      */
-    static boolean shouldSpawnMiner() throws GameActionException {
-    	//Make more advanced later
-    	if(numMinersSpawned > 5)
-    		return false;
-    	return true;
+    static void decodeMessage(int[] message) throws GameActionException {
+    	switch(message[0]) {
+    		case 1: //Enemy HQ position
+    			ENEMY_HQ_LOCATION = new MapLocation(message[1], message[2]);
+    		break;
+    	}
     }
     
     /**
@@ -684,19 +775,6 @@ public strictfp class RobotPlayer {
     	}
     	closestRefinery = findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam());
     	return true;
-    }
-    
-    /**
-     * Decides if a miner should create a refienry based off of current game parameters
-     * 
-     * @return true if a refinery should be spawned
-     * @throws GameActionException
-     */
-    static boolean shouldSpawnRefinery() throws GameActionException {
-    	if(rc.getLocation().distanceSquaredTo(TEAM_HQ_LOCATION) > 25 && rc.getLocation().distanceSquaredTo(targetLocation) > 25) {
-    		return true;
-    	}
-    	return false;
     }
     
     /**
@@ -750,38 +828,5 @@ public strictfp class RobotPlayer {
      **/
     static void createNewPath(MapLocation loc) throws GameActionException {
     	
-    }
-    
-    /**
-     * Scans the area for all nearby enemy robots and does stuff based off of what they find
-     * 
-     * @param none
-     * @returns none
-     * @throws GameActonException 
-     */
-    static void scanForEnemyRobots() throws GameActionException {
-    	RobotInfo[] robots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), rc.getTeam().opponent());
-    	
-    	for(RobotInfo robot : robots) {
-    		if(robot.getType().equals(RobotType.HQ)) {
-    			//Submit to blockchain
-    		}
-    	}
-    }
-    
-    /**
-     * Updates the lastRoundBlock to whatever messages were send to the blockchain
-     * 
-     * @param none
-     * @return none
-     * @throws GameActionException
-     */
-    static void getLastBlock() throws GameActionException {
-    	try {
-    		lastRoundBlock = rc.getBlock(rc.getRoundNum() - 1);
-    	} catch(GameActionException e) {
-    		System.out.println("Something went wrong");
-    		System.out.println("Probably no block to get");
-    	}
     }
 }
