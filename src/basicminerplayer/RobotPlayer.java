@@ -410,45 +410,25 @@ public strictfp class RobotPlayer {
             case 0: //do nothing
             break;
                 
-            case 1: //determine bot to carry and move to it
+            case 1: //determine enemy bot to carry and move to it
                 RobotInfo[] nearbyBots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), opponentTeam);
-                if(nearbyBots.length==0){
+                if(nearbyBots.length == 0){
                     tryMove(randomDirection());
+                } else {
+                	for(RobotInfo robot : nearbyBots) {
+                		if(robot.getType().equals(RobotType.MINER) || robot.getType().equals(RobotType.LANDSCAPER)) {
+                			//Add in try to pickup and move towards
+                		}
+                	}
                 }
-                RobotInfo targetBot;
-                for(int i = nearbyBots.length-1; i>=0 ; i--){
-                    if(nearbyBots[i].getType().equals(RobotType.LANDSCAPER)||nearbyBots[i].getType().equals(RobotType.MINER)){
-                        targetBot=nearbyBots[i];
-                    }
-                }
-                if(rc.canPickUpUnit(targetBot.ID)) {
-                    rc.pickUpUnit(targetBot.ID);
-                    objective=2;
-                }  else {
-                    rc.move(rc.getLocation().directionTo(targetBot.getLocation()));
-                }
+                
+                
+                
+                
             case 2: //Find water and drop
                 MapLocation targetLocation = scanForNearbyWater();
-                ArrayList<MapLocation> flooding= getFlooding();
-                if(flooding.size()==0){
-                    tryMove(randomDirection());
-                }else{
-                    //Find closest flooded location
-                    for(MapLocation x : flooding){
-                        if(rc.getLocation().distanceSquaredTo(x)<minDistanceSquared){
-                            targetLocation=x;
-                            minDistanceSquared=rc.getLocation().distanceSquaredTo(x);
-                        }
-                    }
-                }
-                if(rc.getLocation().isAdjacentTo(x)){
-                    rc.dropUnit(rc.getLocation().directionTo(targetLocation.getLocation()));
-                    objective=1;
-                }else{
-                    if(rc.canMove(rc.getLocation().directionTo(targetLocation.getLocation()))){
-                    rc.move(rc.getLocation().directionTo(targetLocation.getLocation());
-                    }
-                }
+                
+                // Add in pathfinding
             case 3:
 
         }
@@ -475,6 +455,16 @@ public strictfp class RobotPlayer {
      */
     static Direction randomDirection() {
         return directions[(int) (Math.random() * directions.length)];
+    }
+    
+    /**
+     * Returns a random mapLocation on the board
+     * 
+     * @returns  random MapLocaiton
+     * @throws GameActionException
+     */
+    static MapLocation randomLocation() throws GameActionException {
+    	return new MapLocation((int)(Math.random() * MAP_HEIGHT), (int)(Math.random() * MAP_WIDTH));
     }
 
     /**
@@ -709,6 +699,33 @@ public strictfp class RobotPlayer {
     }
     
     /**
+     * Find the nearest water tile within the robots current sensor radius
+     * 
+     * @param none
+     * @returns MapLocation of nearest water tile
+     * @throws GameActionException
+     */
+    static MapLocation scanForNearbyWater() throws GameActionException {
+    	int rootRadius = (int) Math.floor(Math.sqrt(rc.getCurrentSensorRadiusSquared()));
+    	MapLocation closestWater = new MapLocation(-1, -1); 
+    	int closestWaterDistance = 999;
+    	
+    	for(int x = -rootRadius; x <= rootRadius; x++) {
+    		for(int y = -rootRadius; y <= rootRadius; y++) {
+    			//System.out.println(x + " " + y);
+    			MapLocation testLoc = rc.getLocation().translate(x, y);
+    			if(rc.canSenseLocation(testLoc)) {
+    				if(rc.senseFlooding(testLoc) && rc.getLocation().distanceSquaredTo(testLoc) < closestWaterDistance) {
+    					closestWater = testLoc;
+    					closestWaterDistance = rc.getLocation().distanceSquaredTo(testLoc);
+    				}
+    			}
+    		}
+    	}
+    	return closestWater;
+    }
+    
+    /**
      * Scans the area for all nearby enemy robots and does stuff based off of what they find
      * 
      * @param none
@@ -726,18 +743,6 @@ public strictfp class RobotPlayer {
     			}
     		}
     	}
-    }
-    
-    /**
-     * Find the nearest water tile within the robots current sensor radius
-     * 
-     * @param none
-     * @returns MapLocation of nearest water tile
-     * @throws GameActionException
-     */
-    static MapLocation scanForNearbyWater() throws GameActionException {
-    	
-    	return INVALID_LOCATION;
     }
     
     /**
