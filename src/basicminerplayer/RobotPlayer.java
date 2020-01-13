@@ -62,7 +62,7 @@ public strictfp class RobotPlayer {
     static final MapLocation INVALID_LOCATION = new MapLocation(-1, -1);
     
     static int transIdent = 420; //Blaze it
-    static Transaction[] lastRoundBlock;
+    static Transaction[] lastRoundBlock = new Transaction[0];
     
     static boolean[][] obstacles = new boolean[7][7];
     static boolean[][] checked = new boolean[7][7];
@@ -819,6 +819,7 @@ public strictfp class RobotPlayer {
     	} catch(GameActionException e) {
     		System.out.println("Something went wrong");
     		System.out.println("Probably no block to get");
+    		lastRoundBlock = new Transaction[0];
     	}
     }
     
