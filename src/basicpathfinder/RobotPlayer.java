@@ -222,9 +222,14 @@ public strictfp class RobotPlayer {
      * @throws GameActionException
      */
     static boolean tryMove(Direction dir) throws GameActionException {
-        // System.out.println("I am trying to move " + dir + "; " + rc.isReady() + " " + rc.getCooldownTurns() + " " + rc.canMove(dir));
+        //System.out.println("I am trying to move " + dir + "; " + rc.isReady() + " " + rc.getCooldownTurns() + " " + rc.canMove(dir));
         if (rc.isReady() && rc.canMove(dir)) {
+        	moveIndex++;
+    		//System.out.println("huh, that's cool");
+    		//System.out.println("Moved in Direction" + moves[moveIndex-1]);
+        	//System.out.println("inside the if statement in tryMove()");
             rc.move(dir);
+           // System.out.println("ran rc.move(dir);");
             return true;
         } else return false;
     }
@@ -286,12 +291,23 @@ public strictfp class RobotPlayer {
     }
     
     static void followPath() throws GameActionException {
-    	moveIndex++;
+    	//System.out.println("In followPath()");
+    	//System.out.println(rc.isReady());
+    	//System.out.println(rc.canMove(moves[moveIndex]));
+    	tryMove(moves[moveIndex]);
     	if(!(tryMove(moves[moveIndex]))) {
-    		mapObstacles();
-    		createPath();
+    	//	System.out.println("Not good, but can still be saved");
+    		if(rc.isReady() && rc.canMove(moves[moveIndex])) {
+    	//		System.out.println("NOW WE'RE FUCKED BOYS!");
+    			mapObstacles();
+    			createPath();
+    		}
     	}
-    	System.out.println("Moved in Direction" + moves[moveIndex]);
+    	else if(moves[moveIndex] == Direction.CENTER) {
+    		FollowingPath = false;
+    	//	System.out.println("maybe good maybe bad");
+    	}
+    	
     	
     }
     
@@ -303,7 +319,7 @@ public strictfp class RobotPlayer {
     	MapLocation currentLocation = rc.getLocation();
     	int CurX = currentLocation.x;
     	int CurY = currentLocation.y;
-    	System.out.println("in mapObstacles");
+    	//System.out.println("in mapObstacles");
     	RobotInfo robots[];
     	if(rc.canSenseRadiusSquared(3)) {
     		robots = rc.senseNearbyRobots(3);
@@ -358,22 +374,24 @@ public strictfp class RobotPlayer {
     	// Closest Target Works ^
     	Direction moveDir = CurLoc.directionTo(target);
     	for(int i = 0; i < 10; i++) {
-    		if(CurX == CloseX && CurY == CloseY || moveDir == Direction.CENTER)
+    		if(CurX == CloseX && CurY == CloseY || moveDir == Direction.CENTER) {
     			i = 10;
-    		while(canMove(CurLoc, moveDir, CurX, CurY) == false) {
-    			moveDir = moveDir.rotateRight();
     		}
-    		if(canMove(CurLoc, moveDir, CurX, CurY)) {
-    			MapLocation temp = CurLoc.add(moveDir);
-    			CurX += temp.x-CurLoc.x;
-    			CurY += CurLoc.y-temp.y;
-    			CurLoc = temp;
-    			//System.out.println("New Coordinate is [" + CurX + "," + CurY + "]");
-    		}
-    		moves[i] = moveDir;
-    		moveDir = CurLoc.directionTo(target);
-    		
-    		
+    		else {
+    			while(canMove(CurLoc, moveDir, CurX, CurY) == false) {
+        			moveDir = moveDir.rotateRight();
+        		}
+        		if(canMove(CurLoc, moveDir, CurX, CurY)) {
+        			MapLocation temp = CurLoc.add(moveDir);
+        			CurX += temp.x-CurLoc.x;
+        			CurY += CurLoc.y-temp.y;
+        			CurLoc = temp;
+        			//System.out.println("New Coordinate is [" + CurX + "," + CurY + "]");
+        		}
+        		moves[i] = moveDir;
+        		//System.out.println(moves[i]);
+        		moveDir = CurLoc.directionTo(target);
+    		}    		
     	}	
     }
     
