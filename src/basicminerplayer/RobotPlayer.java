@@ -521,6 +521,12 @@ public strictfp class RobotPlayer {
     	if(!(rc.senseFlooding(rc.getLocation().add(dir))) && rc.canMove(dir)) {
     		rc.move(dir);
     		return true;
+    	} else if(!(rc.senseFlooding(rc.getLocation().add(dir.rotateLeft()))) && rc.canMove(dir.rotateLeft())) {
+    		rc.move(dir.rotateLeft());
+    		return true;
+    	} else if(!(rc.senseFlooding(rc.getLocation().add(dir.rotateRight()))) && rc.canMove(dir.rotateRight())) {
+    		rc.move(dir.rotateRight());
+    		return true;
     	}
     	return false;
     }
