@@ -28,7 +28,8 @@ public strictfp class RobotPlayer {
      * targetLocation is MapLocation of where the current target
      * INVALID_LOCATION is a constant used to replace null values for a location to keep the code happy (basically means no location)
      * 
-     * transactionIdentifier is a number added to transactions to identify that transaction as from this team (encryption)
+     * transIdent is a number added to transactions to identify that transaction as from this team (encryption)
+     * lastRoundBlock is block of transactions which happened last round
      * 
      * obstacles is a matrix which shows where a robot can currently not move
      * elevations is a matrix which holds information about elevation around the robot
@@ -50,7 +51,8 @@ public strictfp class RobotPlayer {
     static MapLocation targetLocation = new MapLocation(-1, -1);
     static final MapLocation INVALID_LOCATION = new MapLocation(-1, -1);
     
-    static int transactionIdentifier = 420; //Blaze it
+    static int transIdent = 420; //Blaze it
+    static Transaction[] lastRoundBlock;
     
     static boolean[][] obstacles = new boolean[7][7];
     static int[][] elevations = new int[7][7];
@@ -114,6 +116,8 @@ public strictfp class RobotPlayer {
                 // Here, we've separated the controls into a different method for each RobotType.
                 // You can add the missing ones or rewrite this into your own control structure.
                 //System.out.println("I'm a " + rc.getType() + "! Location " + rc.getLocation());
+            	updateTransIdent();
+            	getLastBlock();
                 switch (rc.getType()) {
                     case HQ:                 runHQ();                break;
                     case MINER:              runMiner();             break;
@@ -149,7 +153,7 @@ public strictfp class RobotPlayer {
     		
     		MapLocation maxSoupLocation = scanForSoup(rc.getCurrentSensorRadiusSquared());
     		//System.out.println("The maximum amount of soup is located at (" + maxSoup.x + ", " + maxSoup.y + ")");
-    		int[] message = {TEAM_HQ_LOCATION.x, TEAM_HQ_LOCATION.y, maxSoupLocation.x, maxSoupLocation.y, 0, 0, transactionIdentifier}; //first two ints are the HQ xy pos and second are closest soup locations
+    		int[] message = {TEAM_HQ_LOCATION.x, TEAM_HQ_LOCATION.y, maxSoupLocation.x, maxSoupLocation.y, 0, 0, transIdent}; //first two ints are the HQ xy pos and second are closest soup locations
     		rc.submitTransaction(message, 1);
     		
     		if(maxSoupLocation.x != -1) { // If there is soup near, spawn closest to soup.  Otherwise go towards center of map
@@ -200,7 +204,7 @@ public strictfp class RobotPlayer {
     	if(turnCount == 1) {
     		Transaction[] roundOneBlock = rc.getBlock(1);
     		debugPrintTransactionBlock(roundOneBlock);
-    		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(roundOneBlock, rc.getTeam());
+    		Transaction[] roundOneTeamBlock = seperateTransactionsFromTeam(roundOneBlock, 1, rc.getTeam());
     		int[] roundOneMessage = roundOneTeamBlock[0].getMessage();
     		
     		TEAM_HQ_LOCATION = new MapLocation(roundOneMessage[0], roundOneMessage[1]);
@@ -585,15 +589,25 @@ public strictfp class RobotPlayer {
     }
     
     /**
+     * Updates transIdent based off of round
+     * 
+     * @param none
+     * @return none
+     * @throws GameActionException
+     */
+    static void updateTransIdent() throws GameActionException {
+    	transIdent = transIdent + (rc.getRoundNum() * 7);
+    }
+    
+    /**
      * Verifies a message is from our team
      * 
      * @param message (int array) to be verified
      * @returns true if the message is from our team, false otherwise
      * @throws GameActionException
      */
-    static boolean verifyMessage(int[] message) throws GameActionException {
-    	//Implement later
-    	return(message[6] == transactionIdentifier);
+    static boolean verifyMessage(int[] message, int roundNum) throws GameActionException {
+    	return(message[6] == transIdent - (7*(rc.getRoundNum() - roundNum)));
     }
     
     /**
@@ -603,12 +617,12 @@ public strictfp class RobotPlayer {
      * @returns block of transactions from specific team
      * @throws GameActionException
      */
-    static Transaction[] seperateTransactionsFromTeam(Transaction[] block, Team team) throws GameActionException {
+    static Transaction[] seperateTransactionsFromTeam(Transaction[] block, int roundNum, Team team) throws GameActionException {
     	Transaction[] teamBlock = new Transaction[7];
     	int teamBlockIndex = 0;
     	
     	for(int i = 0; i < block.length; i++) {
-    		if(verifyMessage(block[i].getMessage())) {
+    		if(verifyMessage(block[i].getMessage(), roundNum)) {
     			teamBlock[teamBlockIndex++] = block[i];
     		}
     	}
@@ -709,5 +723,38 @@ public strictfp class RobotPlayer {
      **/
     static void createNewPath(MapLocation loc) throws GameActionException {
     	
+    }
+    
+    /**
+     * Scans the area for all nearby enemy robots and does stuff based off of what they find
+     * 
+     * @param none
+     * @returns none
+     * @throws GameActonException 
+     */
+    static void scanForEnemyRobots() throws GameActionException {
+    	RobotInfo[] robots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), rc.getTeam().opponent());
+    	
+    	for(RobotInfo robot : robots) {
+    		if(robot.getType().equals(RobotType.HQ)) {
+    			//Submit to blockchain
+    		}
+    	}
+    }
+    
+    /**
+     * Updates the lastRoundBlock to whatever messages were send to the blockchain
+     * 
+     * @param none
+     * @return none
+     * @throws GameActionException
+     */
+    static void getLastBlock() throws GameActionException {
+    	try {
+    		lastRoundBlock = rc.getBlock(rc.getRoundNum() - 1);
+    	} catch(GameActionException e) {
+    		System.out.println("Something went wrong");
+    		System.out.println("Probably no block to get");
+    	}
     }
 }
