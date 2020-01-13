@@ -159,24 +159,31 @@ public strictfp class RobotPlayer {
     //Code to run landscaper
     //Currently wan to build a wall around HQ
     static void runLandscaper() throws GameActionException {
+    	//this stuff gives the surrounding coordinates so the landscaper can come to this location
     	MapLocation[] adjacent = {TEAM_HQ_LOCATION.add(Direction.NORTH), TEAM_HQ_LOCATION.add(Direction.SOUTH), TEAM_HQ_LOCATION.add(Direction.EAST), TEAM_HQ_LOCATION.add(Direction.WEST)};
+    	//this code gives location of landscaper so landscaper can go back to the HQ coordinates
     	MapLocation landscaper = rc.getLocation();
     	Direction d = landscaper.directionTo(TEAM_HQ_LOCATION);
+    	//only run this code if the dirt count is 0
     	if(rc.getDirtCarrying() == 0)
     	{
-        	for(int i = 0; i < 10; i ++)
+    		//this makes sure that the landscaper is a far enough distance away from the HQ so that it can start mining
+        	while(rc.getLocation().isWithinDistanceSquared(TEAM_HQ_LOCATION, 200))
         	{
         		tryMove(Direction.SOUTH);
         	}
+        	//mining a good 25 blocks
         	for(int a = 0; a < 25; a++)
     		{
-        		rc.digDirt(Direction.SOUTH);
-        		System.out.println("Yuh");
+        		System.out.println("gang gang" + rc.getDirtCarrying());
     		}
     	}
+    	//move back to the HQ
     	tryMove(d);
+    	//this stuff should be able to go around the HQ coordinates and place down the blocks in the location mentioned above
     	for(MapLocation h: adjacent)
     	{
+    		landscaper = rc.getLocation();
     		Direction g = landscaper.directionTo(h);
     		tryMove(g);
     		for(int b = 0; b < 3; b++)
@@ -185,15 +192,7 @@ public strictfp class RobotPlayer {
     		}
     	}
     	
-    	
-        	/*for(int b = 0; b < 10; b++)
-    		{
-    		tryMove(Direction.NORTH);
-    		}*/
-    	
-        	//TEAM_HQ_LOCATION;
-    	
-    		
+
         
     }
     
