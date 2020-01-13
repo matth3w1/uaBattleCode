@@ -225,11 +225,11 @@ public strictfp class RobotPlayer {
         //System.out.println("I am trying to move " + dir + "; " + rc.isReady() + " " + rc.getCooldownTurns() + " " + rc.canMove(dir));
         if (rc.isReady() && rc.canMove(dir)) {
         	moveIndex++;
-    		//System.out.println("huh, that's cool");
-    		//System.out.println("Moved in Direction" + moves[moveIndex-1]);
-        	//System.out.println("inside the if statement in tryMove()");
+    		System.out.println("huh, that's cool");
+    		System.out.println("Moved in Direction" + moves[moveIndex-1]);
+        	System.out.println("inside the if statement in tryMove()");
             rc.move(dir);
-           // System.out.println("ran rc.move(dir);");
+            System.out.println("ran rc.move(dir);");
             return true;
         } else return false;
     }
@@ -291,13 +291,16 @@ public strictfp class RobotPlayer {
     }
     
     static void followPath() throws GameActionException {
+    	
     	//System.out.println("In followPath()");
     	//System.out.println(rc.isReady());
     	//System.out.println(rc.canMove(moves[moveIndex]));
-    	tryMove(moves[moveIndex]);
-    	if(!(tryMove(moves[moveIndex]))) {
+    	
+    	//tryMove(moves[moveIndex]); // Tries to move to next direction
+    	if(!(tryMove(moves[moveIndex]))) { // If move fails, it tries to figure out why
     	//	System.out.println("Not good, but can still be saved");
-    		if(rc.isReady() && rc.canMove(moves[moveIndex])) {
+    		System.out.println("Code Still Works?");
+    		if(!rc.canMove(moves[moveIndex])) { // Checks if it is due to cooldown
     	//		System.out.println("NOW WE'RE FUCKED BOYS!");
     			mapObstacles();
     			createPath();
