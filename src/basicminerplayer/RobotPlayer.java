@@ -56,7 +56,7 @@ public strictfp class RobotPlayer {
     //Maybe add a transaction array for the round one block for every robot to add to?
     //Round 1 block will need more useful information for this to be useful
     
-    static int objective = 0; 
+    static int objective = 1; 
     
     static MapLocation targetLocation = new MapLocation(-1, -1);
     static final MapLocation INVALID_LOCATION = new MapLocation(-1, -1);
@@ -233,7 +233,7 @@ public strictfp class RobotPlayer {
     		if(rc.getRoundNum() < 5) { //If this is the first miner spawned
 	    		targetLocation = new MapLocation(roundOneMessage[2], roundOneMessage[3]);
 	    		if(!(targetLocation.equals(INVALID_LOCATION))) { //If there is soup near the HQ
-	    			objective = 1;
+	    			objective = 2;
 	    		} else { //No nearby soup so look for soup.  Go to center and look for soup
 	    			targetLocation = new MapLocation(rc.getMapHeight() / 2, rc.getMapWidth() / 2);
 	    			objective = 1;
@@ -879,11 +879,14 @@ public strictfp class RobotPlayer {
      * @throws GameActionEception
      */
     static boolean updateClosestRefinery() throws GameActionException {
-    	if(findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam()).equals(INVALID_LOCATION)) {
-    		return false;
+    	if(!(findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam()).equals(INVALID_LOCATION))) {
+    		closestRefinery = findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam());
+    		return true;
+    	} else if(!(findNearestRobotTypeOnTeam(RobotType.HQ, rc.getTeam()).equals(INVALID_LOCATION))) {
+    		closestRefinery = findNearestRobotTypeOnTeam(RobotType.HQ, rc.getTeam());
+    		return true;
     	}
-    	closestRefinery = findNearestRobotTypeOnTeam(RobotType.REFINERY, rc.getTeam());
-    	return true;
+    	return false;
     }
     
     /**
