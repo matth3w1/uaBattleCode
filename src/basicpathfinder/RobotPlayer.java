@@ -25,7 +25,10 @@ public strictfp class RobotPlayer {
     //Also need to differentiate between robot types
 
     static boolean[][] obstacles = new boolean[7][7];
+    static boolean[][] checked = new boolean[7][7];
     static int[][] elevation = new int[7][7];
+    static MapLocation target;
+    static int moveIndex = 0;
     static Direction[] moves = new Direction[10]; 
     /**
      * run() is the method that is called when a robot is instantiated in the Battlecode world.
@@ -269,11 +272,10 @@ public strictfp class RobotPlayer {
     }
     
     static void followPath() throws GameActionException {
-    	
-    	Direction dir = moves[moveIndex++];
-    	if(!(tryMove(dir))) {
-    		remapObstacles();
-    		createNewPath();
+    	moveIndex++;
+    	if(!(tryMove(moves[moveIndex]))) {
+    		mapObstacles();
+    		createPath(target);
     	}
     	
     }
@@ -283,15 +285,40 @@ public strictfp class RobotPlayer {
     	if(rc.canSenseRadiusSquared(3)) {
     		robots = rc.senseNearbyRobots(3);
     		for(int i = 0; i < robots.length; i++) {
-    			obstacles[robots[i].getLocation().x-currentLocation.x][robots[i].getLocation().y-currentLocation.y] = false;
+    			int xCoord = 4+robots[i].getLocation().x-currentLocation.x;
+    			int yCoord = 4+robots[i].getLocation().y-currentLocation.y;
+    			obstacles[xCoord][yCoord] = false;
+    			checked[xCoord][yCoord] = true;
     		}
     	}
     	for(int i = -3; i < 4; i++) {
     		for(int j = -3; i < 4; j++) {
-    			MapLocation xy = rc.getLocation().translate(i, j);
-    			if(!(rc.senseFlooding(xy)))
-    				obstacles[i+3][j+3] = false;
+    			if(!checked[i+3][j+3]) {
+    				MapLocation xy = rc.getLocation().translate(i, j);
+        			if(!(rc.senseFlooding(xy))) {
+        				obstacles[i+3][j+3] = false;
+        			}
+        			elevation[i][j] = rc.senseElevation(xy);
+    			}
     		}
     	}
+    }
+    static void createPath(MapLocation position) throws GameActionException {
+    	moveIndex = 0;
+    	MapLocation CloseLoc;
+    	int small = 1000;
+    	for(int i = -3; i < 4; i++) {
+    		for(int j = -3; i < 4; j++) {
+    			if(obstacles[i+3][j+3]) {
+    				MapLocation xy = rc.getLocation().translate(i, j);
+    				int temp = xy.distanceSquaredTo(position);
+    				if(temp < small) {
+    					small = temp;
+    					CloseLoc = xy;
+    				}
+    			}
+    		}
+    	}
+    	
     }
 }
