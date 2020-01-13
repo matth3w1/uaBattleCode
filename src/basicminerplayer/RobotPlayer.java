@@ -20,7 +20,8 @@ public strictfp class RobotPlayer {
     
     static int objective = 0; //int reperesenting objective of robot. 0 means no objective and other numbers represent other objectives.  Reference objectives.txt for number explinations
     static int movement = 0; //int for how the robot should move.  If the robot is a building, ignored.  Reference movement.txt for kinds of movements
-    
+    static Team opponentTeam;
+    static Team team;
     //Need different variables to describe what the objective of current robot.  Ex miners want to go to soup unless they have too much
     //Also need to differentiate between robot types
 
@@ -70,7 +71,9 @@ public strictfp class RobotPlayer {
     //Code for the HQ
     static void runHQ() throws GameActionException {
     	if(turnCount == 1) {
-    		TEAM_HQ_LOCATION = rc.getLocation();
+    		team= rc.getTeam();
+    	    	opponentTeam = team.opponent();
+		TEAM_HQ_LOCATION = rc.getLocation();
     		System.out.println("I am HQ located at " + TEAM_HQ_LOCATION);
     	}
     	
