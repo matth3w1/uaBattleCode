@@ -21,6 +21,9 @@ public strictfp class RobotPlayer {
      * ENEMEY_HQ_LOCATION is MapLocation of where the enemy HQ is positioned
      * SPAWN_LOCATION is MapLocation of where this spesific unit has spawned
      * 
+     * opponentTeam is enemy Team, updates on robot's first turn
+     * team is team Team, updates on robot's first turn
+     * 
      * MAP_HEIGHT is an int which represents the map height
      * MAP_WIDTH is an int which represents the map width
      * 
@@ -33,13 +36,19 @@ public strictfp class RobotPlayer {
      * lastRoundBlock is block of transactions which happened last round
      * 
      * obstacles is a matrix which shows where a robot can currently not move
-     * elevations is a matrix which holds information about elevation around the robot
+     * checked is a matrix which ___
+     * elevation is a matrix which holds information about elevation around the robot
+     * target is a MapLocaiton which the robot tries to move toward
+     * moveIndex is the current index for movement to occur
      * moves is a series of directions which the robot will try to move toward a target location
-     * moveIndex is the current index for movement to occur 
+     * followingPath is boolean which 
      */
     static MapLocation TEAM_HQ_LOCATION = new MapLocation(-1, -1);  
     static MapLocation ENEMY_HQ_LOCATION = new MapLocation(-1, -1); 
     static MapLocation SPAWN_LOCATION = new MapLocation(-1, -1); //can this be updates as the robot is created
+    
+    static Team opponentTeam;
+    static Team team;
     
     static int MAP_HEIGHT = 0;
     static int MAP_WIDTH = 0;
@@ -56,9 +65,12 @@ public strictfp class RobotPlayer {
     static Transaction[] lastRoundBlock;
     
     static boolean[][] obstacles = new boolean[7][7];
-    static int[][] elevations = new int[7][7];
-    static Direction[] moves = new Direction[10];
+    static boolean[][] checked = new boolean[7][7];
+    static int[][] elevation = new int[7][7];
+    static MapLocation target = new MapLocation(7,28);
     static int moveIndex = 0;
+    static Direction[] moves = {Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER, Direction.CENTER}; 
+    static boolean followingPath = false;
     
     
     /**
@@ -327,12 +339,22 @@ public strictfp class RobotPlayer {
         // System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()));
     	updateTransIdent();
     	getLastBlock();
+    	
+    	if(turnCount==1) {
+         	Team team = rc.getTeam();
+         	Team opponent = team.opponent();
+    	 }
     }
     
     //Code for the vap
     static void runVaporator() throws GameActionException {
     	updateTransIdent();
     	getLastBlock();
+    	
+    	if(turnCount==1) {
+         	Team team = rc.getTeam();
+         	Team opponent = team.opponent();
+    	 }
 
     }
 
@@ -340,6 +362,11 @@ public strictfp class RobotPlayer {
     static void runDesignSchool() throws GameActionException {
     	updateTransIdent();
     	getLastBlock();
+    	
+    	if(turnCount==1) {
+         	Team team = rc.getTeam();
+         	Team opponent = team.opponent();
+    	 }
 
     }
     
@@ -347,6 +374,11 @@ public strictfp class RobotPlayer {
     static void runFulfillmentCenter() throws GameActionException {
     	updateTransIdent();
     	getLastBlock();
+    	
+    	 if(turnCount==1) {
+         	Team team = rc.getTeam();
+         	Team opponent = team.opponent();
+    	 }
 
     }
     
@@ -355,6 +387,11 @@ public strictfp class RobotPlayer {
     static void runLandscaper() throws GameActionException {
     	updateTransIdent();
     	getLastBlock();
+    	
+    	 if(turnCount==1) {
+         	Team team = rc.getTeam();
+            Team opponent = team.opponent();
+    	 }
 
     }
     
@@ -362,7 +399,59 @@ public strictfp class RobotPlayer {
     static void runDeliveryDrone() throws GameActionException {
     	updateTransIdent();
     	getLastBlock();
-       
+
+        if(turnCount==1) {
+        	Team team = rc.getTeam();
+            Team opponent = team.opponent();
+            objective = 1;
+        }
+        
+        switch(objective) {
+            case 0: //do nothing
+            break;
+                
+            case 1: //determine bot to carry and move to it
+                RobotInfo[] nearbyBots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), opponentTeam);
+                if(nearbyBots.length==0){
+                    tryMove(randomDirection());
+                }
+                RobotInfo targetBot;
+                for(int i = nearbyBots.length-1; i>=0 ; i--){
+                    if(nearbyBots[i].getType().equals(RobotType.LANDSCAPER)||nearbyBots[i].getType().equals(RobotType.MINER)){
+                        targetBot=nearbyBots[i];
+                    }
+                }
+                if(rc.canPickUpUnit(targetBot.ID)) {
+                    rc.pickUpUnit(targetBot.ID);
+                    objective=2;
+                }  else {
+                    rc.move(rc.getLocation().directionTo(targetBot.getLocation()));
+                }
+            case 2: //Find water and drop
+                MapLocation targetLocation = scanForNearbyWater();
+                ArrayList<MapLocation> flooding= getFlooding();
+                if(flooding.size()==0){
+                    tryMove(randomDirection());
+                }else{
+                    //Find closest flooded location
+                    for(MapLocation x : flooding){
+                        if(rc.getLocation().distanceSquaredTo(x)<minDistanceSquared){
+                            targetLocation=x;
+                            minDistanceSquared=rc.getLocation().distanceSquaredTo(x);
+                        }
+                    }
+                }
+                if(rc.getLocation().isAdjacentTo(x)){
+                    rc.dropUnit(rc.getLocation().directionTo(targetLocation.getLocation()));
+                    objective=1;
+                }else{
+                    if(rc.canMove(rc.getLocation().directionTo(targetLocation.getLocation()))){
+                    rc.move(rc.getLocation().directionTo(targetLocation.getLocation());
+                    }
+                }
+            case 3:
+
+        }
     }
 
     //code to run net gun
@@ -640,6 +729,18 @@ public strictfp class RobotPlayer {
     }
     
     /**
+     * Find the nearest water tile within the robots current sensor radius
+     * 
+     * @param none
+     * @returns MapLocation of nearest water tile
+     * @throws GameActionException
+     */
+    static MapLocation scanForNearbyWater() throws GameActionException {
+    	
+    	return INVALID_LOCATION;
+    }
+    
+    /**
      * Finds the nearest type of robot
      * 
      * @param type of robot to look for
@@ -778,55 +879,156 @@ public strictfp class RobotPlayer {
     }
     
     /**
-     * Basic pathfinding which executes moves from an array, updating if the moves cannot be performed
+     * Moves along the path, updating path if the robot cannot move along a path
      * 
      * @param none
-     * @return none
+     * @returns none 
      * @throws GameActionException
      */
     static void followPath() throws GameActionException {
+    	//System.out.println("In followPath()");
+    	//System.out.println(rc.isReady());
+    	//System.out.println(rc.canMove(moves[moveIndex]));
     	
-    	Direction dir = moves[moveIndex++];
-    	if(!(tryMove(dir))) {
-    		mapObstacles();
-    		createNewPath(targetLocation);
+    	//TODO tryMove is called twice, check with JC
+    	
+    	tryMove(moves[moveIndex]);
+    	if(!(tryMove(moves[moveIndex]))) {
+    	//	System.out.println("Not good, but can still be saved");
+    		if(rc.isReady() && rc.canMove(moves[moveIndex])) {
+    	//		System.out.println("NOW WE'RE FUCKED BOYS!");
+    			mapObstacles();
+    			createPath();
+    		}
     	}
+    	else if(moves[moveIndex] == Direction.CENTER) {
+    		followingPath = false;
+    	//	System.out.println("maybe good maybe bad");
+    	}
+    	
     	
     }
     
     /**
-     * Updates obstacle matrix for locations which the robot cannot move onto
+     * Maps the obstacles around the robot, updating obstacles matrix
      * 
      * @param none
      * @return none
      * @throws GameActionException
      */
+    // If there is an Obstacle at that position, it will return false
+    // If there isn't, it will return true
+    // It begins but sensing nearby robots to detect positions of robots in its path
+    // It then goes through the loop and checks for flooding as well as finding elevation of the tile
     static void mapObstacles() throws GameActionException {
     	MapLocation currentLocation = rc.getLocation();
+    	int CurX = currentLocation.x;
+    	int CurY = currentLocation.y;
+    	//System.out.println("in mapObstacles");
     	RobotInfo robots[];
     	if(rc.canSenseRadiusSquared(3)) {
     		robots = rc.senseNearbyRobots(3);
     		for(int i = 0; i < robots.length; i++) {
-    			obstacles[robots[i].getLocation().x-currentLocation.x][robots[i].getLocation().y-currentLocation.y] = false;
+    			int xCoord = 3+robots[i].getLocation().x-CurX;
+    			int yCoord = 3+CurY-robots[i].getLocation().y;
+    			obstacles[xCoord][yCoord] = false;
+    			checked[xCoord][yCoord] = true;
     		}
     	}
+    	// Sensing Robot Works ^
     	for(int i = -3; i < 4; i++) {
-    		for(int j = -3; i < 4; j++) {
-    			MapLocation xy = rc.getLocation().translate(i, j);
-    			if(!(rc.senseFlooding(xy)))
-    				obstacles[i+3][j+3] = false;
+    		for(int j = -3; j < 4; j++) {
+    			if(!checked[i+3][j+3]) {
+    				MapLocation xy = rc.getLocation().translate(i, j);
+        			if(!(rc.senseFlooding(xy))) {
+        				obstacles[i+3][j+3] = true;
+        			}
+        			elevation[i+3][j+3] = rc.senseElevation(xy);
+        			//System.out.println("Coordinate [" + xy.x + "," + xy.y + "]'s Elevation is " + elevation[i+3][j+3]);
+    			}
     		}
     	}
+    	// Sensing Elevation Works ^
     }
     
     /**
-     * Create a new path to a location
+     * Creates a new path for the robot to follow to a target location
      * 
-     * @param MapLocation to pathfind to
+     * @param none
      * @return none
      * @throws GameActionException
-     **/
-    static void createNewPath(MapLocation loc) throws GameActionException {
-    	
+     */
+    static void createPath() throws GameActionException {
+    	//System.out.println("in createPath");
+    	moveIndex = 0; // Resets move index for the array
+    	int CurX = 3; // Current Y position
+    	int CurY = 3; // Current X position
+    	int CloseX = target.x; // Used to find closest X
+    	int CloseY = target.y; // Used to find closest Y
+    	int small = 1000; // Used for distanceSquare calculations
+    	MapLocation CloseLoc = new MapLocation(20,20); // Location of the closest tile to final destination
+    	MapLocation CurLoc = rc.getLocation(); // Current Location of Robot
+    	for(int i = -3; i < 4; i++) {
+    		for(int j = -3; j < 4; j++) {
+    			if(obstacles[i+3][j+3]) {
+    				MapLocation xy = CurLoc.translate(i, j);
+    				int temp = xy.distanceSquaredTo(target);
+    				if(temp < small) {
+    					small = temp;
+    					CloseLoc = xy;
+    					CloseX = i;
+    					CloseY = j;
+    				}
+    			}
+    		}
+    	}
+    	//System.out.println("Closest Coordinate to Target is [" + CloseLoc.x + "," + CloseLoc.y + "]");
+    	// Closest Target Works ^
+    	Direction moveDir = CurLoc.directionTo(target);
+    	for(int i = 0; i < 10; i++) {
+    		if(CurX == CloseX && CurY == CloseY || moveDir == Direction.CENTER) {
+    			i = 10;
+    		}
+    		else {
+    			while(canMove(CurLoc, moveDir, CurX, CurY) == false) {
+        			moveDir = moveDir.rotateRight();
+        		}
+        		if(canMove(CurLoc, moveDir, CurX, CurY)) {
+        			MapLocation temp = CurLoc.add(moveDir);
+        			CurX += temp.x-CurLoc.x;
+        			CurY += CurLoc.y-temp.y;
+        			CurLoc = temp;
+        			//System.out.println("New Coordinate is [" + CurX + "," + CurY + "]");
+        		}
+        		moves[i] = moveDir;
+        		//System.out.println(moves[i]);
+        		moveDir = CurLoc.directionTo(target);
+    		}    		
+    	}	
+    }
+    
+    /**
+     * 
+     * @param loc is current location of robot
+     * @param dir is the direction wanted to move
+     * @param CurrentX is x index of the matrix
+     * @param CurrentY is y index of the matrix
+     * @return true if the robot can move onto the indicated location
+     */
+    static boolean canMove(MapLocation loc, Direction dir, int CurrentX, int CurrentY) {
+    	MapLocation temp = loc.add(dir);
+    	int newX = CurrentX+temp.x-loc.x;
+    	int newY = CurrentY+loc.y-temp.y;
+//    	System.out.println(dir);
+//    	System.out.println(CurrentX);
+//    	System.out.println(CurrentY);
+//    	System.out.println(newX);
+//    	System.out.println(newY);
+//    	System.out.println(obstacles[newX][newY]);
+//    	System.out.println(Math.abs(elevation[CurrentX][CurrentY]-elevation[newX][newY]) < 4);
+    	if(obstacles[newX][newY] && Math.abs(elevation[CurrentX][CurrentY]-elevation[newX][newY]) < 4) {
+			return true;
+		}
+    	return false;
     }
 }
