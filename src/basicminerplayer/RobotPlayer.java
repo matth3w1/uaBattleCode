@@ -1,6 +1,8 @@
 package basicminerplayer;
 import battlecode.common.*;
 
+import java.util.ArrayList;
+
 public strictfp class RobotPlayer {
     static RobotController rc;
 
@@ -9,15 +11,15 @@ public strictfp class RobotPlayer {
             RobotType.FULFILLMENT_CENTER, RobotType.NET_GUN};
 
     static int turnCount;
-    
+
     static MapLocation TEAM_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will be updated with team HQ position on turn 0/1?
     static MapLocation ENEMY_HQ_LOCATION = new MapLocation(0, 0); //MapLocation object which will update with TEAM_HQ_LOCATION based on mirroring
     static MapLocation SPAWN_LOCATION = new MapLocation(0, 0); //MapLocation object which holds where a robot spawned
-    
+
     static MapLocation ClosestRefinnery = new MapLocation(-1, -1);
-    
+
     static MapLocation targetLocation = new MapLocation(0, 0); //MapLocation object which current robot will attempt to go to
-    
+
     static int objective = 0; //int reperesenting objective of robot. 0 means no objective and other numbers represent other objectives.  Reference objectives.txt for number explinations
     static int movement = 0; //int for how the robot should move.  If the robot is a building, ignored.  Reference movement.txt for kinds of movements
     static Team opponentTeam;
@@ -37,7 +39,8 @@ public strictfp class RobotPlayer {
         RobotPlayer.rc = rc;
 
         turnCount = 0;
-
+        team= rc.getTeam();
+        opponentTeam = team.opponent();
         System.out.println("I'm a " + rc.getType() + " and I just got created!");
         while (true) {
             turnCount += 1;
@@ -67,69 +70,83 @@ public strictfp class RobotPlayer {
             }
         }
     }
-    
+
     //Code for the HQ
     static void runHQ() throws GameActionException {
-    	if(turnCount == 1) {
-    		team= rc.getTeam();
-    	    	opponentTeam = team.opponent();
-		TEAM_HQ_LOCATION = rc.getLocation();
-    		System.out.println("I am HQ located at " + TEAM_HQ_LOCATION);
-    	}
-    	
-    	if(TEAM_HQ_LOCATION.equals(new MapLocation(0, 0))) {
-    		rc.resign();
-    	}
-        
+        if(turnCount == 1) {
+            TEAM_HQ_LOCATION = rc.getLocation();
+            System.out.println("I am HQ located at " + TEAM_HQ_LOCATION);
+        }
+
+        if(TEAM_HQ_LOCATION.equals(new MapLocation(0, 0))) {
+            rc.resign();
+        }
+
     }
 
     //Code for the miner
     //Currently want to move around to seek soup and mine that soup
     //Once an amount of soup has been gathered, move back to HQ and deposit
     static void runMiner() throws GameActionException {
-    	
-    	switch(objective) {
-    		case 0: //Wander randomly and look for soup and refineries
-    		
-    			Direction d;
-    			//Add check case if cooldown is greater than 1
-    			
-    			do {
-    				d  = randomDirection();
-    			} while(!(tryMove(d)));
-    			
-    			//Scans the area around miner for soup
-    			int maxSoup = -1;
-    			MapLocation maxSoupLocation = new MapLocation(-1, -1);
-    			for(int x = 5; x >= -5; x--) {
-    				for(int y = 5; y >= - 5; y--) {
-    					if(rc.canSenseLocation(rc.getLocation().translate(x, y))) {
-    						if(rc.senseSoup(rc.getLocation().translate(x, y)) > maxSoup) {
-    							maxSoupLocation = rc.getLocation().translate(x, y);
-    							maxSoup = rc.senseSoup(rc.getLocation().translate(x, y));
-    						}
-    					}
-    				}
-    			}
-		    	
-		    	
-		    	break;
-		    	
-    		case 1: //Goes to sensed food
-    			
-    			if(rc.getLocation().isAdjacentTo(targetLocation)) {
-    				objective = 2; //Sets objective to mining soup on adjacent tile
-    			} else {
-    				rc.move(rc.getLocation().directionTo(targetLocation));
-    			}
-    	}
-    } 
-    
+
+        switch(objective) {
+            case 0: //Wander randomly and look for soup and refineries
+
+                Direction d;
+                //Add check case if cooldown is greater than 1
+
+                do {
+                    d  = randomDirection();
+                } while(!(tryMove(d)));
+
+                //Scans the area around miner for soup
+                int maxSoup = -1;
+                MapLocation maxSoupLocation = new MapLocation(-1, -1);
+                for(int x = 5; x >= -5; x--) {
+                    for(int y = 5; y >= - 5; y--) {
+                        if(rc.canSenseLocation(rc.getLocation().translate(x, y))) {
+                            if(rc.senseSoup(rc.getLocation().translate(x, y)) > maxSoup) {
+                                maxSoupLocation = rc.getLocation().translate(x, y);
+                                maxSoup = rc.senseSoup(rc.getLocation().translate(x, y));
+                            }
+                        }
+                    }
+                }
+
+
+                break;
+
+            case 1: //Goes to sensed food
+
+                if(rc.getLocation().isAdjacentTo(targetLocation)) {
+                    objective = 2; //Sets objective to mining soup on adjacent tile
+                } else {
+                    rc.move(rc.getLocation().directionTo(targetLocation));
+                }
+            case 2: //Mines soup
+                if(rc.getSoupCarrying()<RobotType.MINER.soupLimit){
+                    if(tryMine(directionTo(targetLocation))
+                        rc.mineSoup(directionTo(targetLocation));
+                }else{
+
+                }
+            case 4:
+                if(rc.getLocation().isAdjacentTo(closestRefinery)){
+                    if(tryRefine(rc.getLocation().directionTo(closestRefinery)))
+                        objective = 1;
+                } else{
+                    if()
+                    moveToward(closestRefinery);
+                }
+
+        }
+    }
+
     //Code for the ref
     static void runRefinery() throws GameActionException {
         // System.out.println("Pollution: " + rc.sensePollution(rc.getLocation()));
     }
-    
+
     //Code for the vap
     static void runVaporator() throws GameActionException {
 
@@ -139,32 +156,83 @@ public strictfp class RobotPlayer {
     static void runDesignSchool() throws GameActionException {
 
     }
-    
+
     //Code for the ful center
     static void runFulfillmentCenter() throws GameActionException {
 
     }
-    
+
     //Code to run landscaper
     //Currently wan to build a wall around HQ
     static void runLandscaper() throws GameActionException {
 
     }
-    
+
     //Code to run delivery drones
     static void runDeliveryDrone() throws GameActionException {
-       
+        Team team = rc.getTeam();
+        Team opponent = team.opponent();
+
+        if(turnCount==1) {
+            objective = 1;
+        }
+        switch(objective) {
+            case 0: //do nothing
+                break;
+            case 1: //determine bot to carry and move to it
+                RobotInfo[] nearbyBots = senseNearbyRobots(rc.getLocation(), -1, opponent);
+                if(nearbyBots.length==0){
+                    tryMove(randomDirection());
+                }
+                RobotInfo targetBot;
+                for(int i = nearbyBots.length-1; i>=0 ; i--){
+                    if(nearbyBots[i].getType().equals(RobotType.LANDSCAPER)||nearbyBots[i].getType().equals(RobotType.MINER)){
+                        targetBot=nearbyBots[i];
+                    }
+                }
+                if(rc.canPickUpUnit(targetBot.ID)) {
+                    rc.pickUpUnit(targetBot.ID);
+                    objective=2;
+                }  else {
+                    rc.move(rc.getLocation().directionTo(targetBot.getLocation()));
+                }
+            case 2: //Find water and drop
+                minDistanceSquared=9999;
+                MapLocation targetLocation;
+                ArrayList<MapLocation> flooding= getFlooding();
+                if(flooding.size()==0){
+                    tryMove(randomDirection());
+                }else{
+                    //Find closest flooded location
+                    for(MapLocation x : flooding){
+                        if(rc.getLocation().distanceSquaredTo(x)<minDistanceSquared){
+                            targetLocation=x;
+                            minDistanceSquared=rc.getLocation().distanceSquaredTo(x);
+                        }
+                    }
+                }
+                if(rc.getLocation().isAdjacentTo(x)){
+                    rc.dropUnit(rc.getLocation().directionTo(targetLocation.getLocation()));
+                    objective=1;
+                }else{
+                    if(rc.canMove(rc.getLocation().directionTo(targetLocation.getLocation()))){
+                    rc.move(rc.getLocation().directionTo(targetLocation.getLocation());
+                    }
+                }
+            case 3:
+
+        }
     }
 
     //code to run net gun
     static void runNetGun() throws GameActionException {
-	//Shoot robots nearest to the team HQ
-	RobotInfo[] nearbyBots = rc.senseNearbyRobots(TEAM_HQ_LOCATION, -1, opponentTeam);
+        //Shoot robots nearest to the team HQ
+        RobotInfo[] nearbyBots = rc.senseNearbyRobots(TEAM_HQ_LOCATION, -1, opponentTeam);
         if(nearbyBots.length>0){
             for (RobotInfo x : nearbyBots)
                 if(rc.canShootUnit(x.ID)) rc.shootUnit(x.ID);
         }else{
-		//Shoot robots nearest itself
+            //Shoot robots nearest itself
             nearbyBots = rc.senseNearbyRobots(rc.getLocation(), -1, opponentTeam);
             if(nearbyBots.length>0){
                 for(RobotInfo x : nearbyBots)
@@ -190,7 +258,7 @@ public strictfp class RobotPlayer {
     static RobotType randomSpawnedByMiner() {
         return spawnedByMiner[(int) (Math.random() * spawnedByMiner.length)];
     }
-    
+
     //Code to check if a robot can move
     //@return true if can move, else false
     static boolean tryMove() throws GameActionException {
@@ -266,7 +334,18 @@ public strictfp class RobotPlayer {
             return true;
         } else return false;
     }
-
+    static ArrayList<MapLocation> getFlooding() throws GameActionException{
+        ArrayList<MapLocation> flooding = new ArrayList<MapLocation>();
+        MapLocation currentLocation =  rc.getLocation();
+        for(int x=-4;x<=4;x++){
+            for(int y=-4;y<=4;y++){
+                if(rc.canSenseLocation(currentLocation.translate(x,y))&& rc.senseFlooding(currentLocation.translate(x,y))){
+                    flooding.add(currentLocation.translate(x,y));
+                }
+            }
+        }
+        return flooding;
+    }
 
     static void tryBlockchain() throws GameActionException {
         if (turnCount < 3) {
