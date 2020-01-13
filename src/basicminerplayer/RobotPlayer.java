@@ -29,6 +29,11 @@ public strictfp class RobotPlayer {
      * INVALID_LOCATION is a constant used to replace null values for a location to keep the code happy (basically means no location)
      * 
      * transactionIdentifier is a number added to transactions to identify that transaction as from this team (encryption)
+     * 
+     * obstacles is a matrix which shows where a robot can currently not move
+     * elevations is a matrix which holds information about elevation around the robot
+     * moves is a series of directions which the robot will try to move toward a target location
+     * moveIndex is the current index for movement to occur 
      */
     static MapLocation TEAM_HQ_LOCATION = new MapLocation(-1, -1);  
     static MapLocation ENEMY_HQ_LOCATION = new MapLocation(-1, -1); 
@@ -46,6 +51,11 @@ public strictfp class RobotPlayer {
     static final MapLocation INVALID_LOCATION = new MapLocation(-1, -1);
     
     static int transactionIdentifier = 420; //Blaze it
+    
+    static boolean[][] obstacles = new boolean[7][7];
+    static int[][] elevations = new int[7][7];
+    static Direction[] moves = new Direction[10];
+    static int moveIndex = 0;
     
     
     /**
@@ -154,6 +164,15 @@ public strictfp class RobotPlayer {
     	
     	//Scans the area for nearby robots
     	//Scans the area for topography (high/low dirt walls and water)
+    	
+    	
+    	//Code for shooting down enemy robots
+    	RobotInfo[] enemyRobots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), rc.getTeam().opponent());
+    	for(RobotInfo robot : enemyRobots) {
+    		if(robot.getType().equals(RobotType.DELIVERY_DRONE)) {
+    			tryShoot(robot.getID());
+    		}
+    	}
     	
     	if(shouldSpawnMiner()) {
     		Direction d = randomDirection();
@@ -326,7 +345,14 @@ public strictfp class RobotPlayer {
 
     //code to run net gun
     static void runNetGun() throws GameActionException {
-
+    	
+    	//Scan for enemy drones and shoot them down
+    	RobotInfo[] enemyRobots = rc.senseNearbyRobots(rc.getCurrentSensorRadiusSquared(), rc.getTeam().opponent());
+    	for(RobotInfo robot : enemyRobots) {
+    		if(robot.getType().equals(RobotType.DELIVERY_DRONE)) {
+    			tryShoot(robot.getID());
+    		}
+    	}
     }
 
     /**
@@ -347,22 +373,19 @@ public strictfp class RobotPlayer {
         return spawnedByMiner[(int) (Math.random() * spawnedByMiner.length)];
     }
     
-    //Code to check if a robot can move
-    //@return true if can move, else false
-    static boolean tryMove() throws GameActionException {
-        for (Direction dir : directions)
-            if (tryMove(dir))
-                return true;
-        return false;
-        // MapLocation loc = rc.getLocation();
-        // if (loc.x < 10 && loc.x < loc.y)
-        //     return tryMove(Direction.EAST);
-        // else if (loc.x < 10)
-        //     return tryMove(Direction.SOUTH);
-        // else if (loc.x > loc.y)
-        //     return tryMove(Direction.WEST);
-        // else
-        //     return tryMove(Direction.NORTH);
+    /**
+     * Attempts to shoot down a drone
+     * 
+     * @param ID of drone
+     * @return true if the robot is shot down, false otherwise
+     * @throws GameActionException
+     */
+    static boolean tryShoot(int id) throws GameActionException {
+    	if(rc.canShootUnit(id)) {
+    		rc.shootUnit(id);
+    		return true;
+    	}
+    	return false;
     }
 
     /**
@@ -633,5 +656,58 @@ public strictfp class RobotPlayer {
     		return true;
     	}
     	return false;
+    }
+    
+    /**
+     * Basic pathfinding which executes moves from an array, updating if the moves cannot be performed
+     * 
+     * @param none
+     * @return none
+     * @throws GameActionException
+     */
+    static void followPath() throws GameActionException {
+    	
+    	Direction dir = moves[moveIndex++];
+    	if(!(tryMove(dir))) {
+    		mapObstacles();
+    		createNewPath(targetLocation);
+    	}
+    	
+    }
+    
+    /**
+     * Updates obstacle matrix for locations which the robot cannot move onto
+     * 
+     * @param none
+     * @return none
+     * @throws GameActionException
+     */
+    static void mapObstacles() throws GameActionException {
+    	MapLocation currentLocation = rc.getLocation();
+    	RobotInfo robots[];
+    	if(rc.canSenseRadiusSquared(3)) {
+    		robots = rc.senseNearbyRobots(3);
+    		for(int i = 0; i < robots.length; i++) {
+    			obstacles[robots[i].getLocation().x-currentLocation.x][robots[i].getLocation().y-currentLocation.y] = false;
+    		}
+    	}
+    	for(int i = -3; i < 4; i++) {
+    		for(int j = -3; i < 4; j++) {
+    			MapLocation xy = rc.getLocation().translate(i, j);
+    			if(!(rc.senseFlooding(xy)))
+    				obstacles[i+3][j+3] = false;
+    		}
+    	}
+    }
+    
+    /**
+     * Create a new path to a location
+     * 
+     * @param MapLocation to pathfind to
+     * @return none
+     * @throws GameActionException
+     **/
+    static void createNewPath(MapLocation loc) throws GameActionException {
+    	
     }
 }
