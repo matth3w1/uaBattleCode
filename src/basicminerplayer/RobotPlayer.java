@@ -155,7 +155,19 @@ public strictfp class RobotPlayer {
 
     //code to run net gun
     static void runNetGun() throws GameActionException {
-
+	//Shoot robots nearest to the team HQ
+	RobotInfo[] nearbyBots = rc.senseNearbyRobots(TEAM_HQ_LOCATION, -1, opponentTeam);
+        if(nearbyBots.length>0){
+            for (RobotInfo x : nearbyBots)
+                if(rc.canShootUnit(x.ID)) rc.shootUnit(x.ID);
+        }else{
+		//Shoot robots nearest itself
+            nearbyBots = rc.senseNearbyRobots(rc.getLocation(), -1, opponentTeam);
+            if(nearbyBots.length>0){
+                for(RobotInfo x : nearbyBots)
+                    if(rc.canShootUnit(x.ID)) rc.shootUnit(x.ID);
+            }
+        }
     }
 
     /**
